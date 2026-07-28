@@ -18,13 +18,13 @@ use core::f64;
 use egui::FontId;
 use egui::Popup;
 use egui::RichText;
-use egui::response;
 use egui::{
     Color32, Pos2, Rect, Stroke, Ui, Vec2,
     epaint::{self, PathShape},
     pos2,
 };
 use std::cmp::*;
+use std::f64::consts::PI;
 use std::ffi::OsString;
 
 pub struct RenderingCircle {
@@ -110,7 +110,7 @@ impl Triangulation {
         scale_factor: f32,
         offset: Vec2,
         width: f32,
-        color: Color,
+        color: Color32,
     ) {
         let mut triangle_vertices: Vec<epaint::Vertex> = Vec::new(); //make a new vector of epaint vertices
         for triangle in &self.inside {
@@ -119,7 +119,7 @@ impl Triangulation {
                 let vertex = epaint::Vertex {
                     pos: point.to_pos2(rect, scale_factor, offset),
                     uv: pos2(0.0, 0.0),
-                    color: color.to_egui(),
+                    color,
                 };
                 triangle_vertices.push(vertex); //add the nondegenerate triangle vertices
             }
@@ -172,9 +172,11 @@ impl RenderPiece {
         let color = match super_data {
             Some(super_data) => {
                 // TODO: rendering goes here
-                Color::Gray
+                let colorous::Color { r, g, b } = colorous::RAINBOW
+                    .eval_continuous((self.isometry.rotation_angle() / (2.0 * PI) + 2.0).fract()); // make sure it's in the range 0.0..1.0
+                Color32::from_rgb(r, g, b)
             }
-            None => self.piece.color,
+            None => self.piece.color.to_egui(),
         };
 
         for triangle in &true_piece.triangulations {

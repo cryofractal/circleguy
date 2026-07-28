@@ -43,6 +43,11 @@ impl Isometry {
             b: cent.0 * (C64 { re: 1.0, im: 0.0 } - phi.0),
         }
     }
+
+    /// The angle of rotation of this isometry.
+    pub fn rotation_angle(self) -> Scalar {
+        self.a.angle()
+    }
 }
 
 impl ApproxEq for Isometry {
