@@ -3,6 +3,7 @@ use crate::{
         arc::Arc,
         c64::Scalar,
         complex_circle::{Circle, Contains, OrientedCircle},
+        isometry::Isometry,
         point::Point,
         rotation::Rotation,
     },
@@ -104,6 +105,11 @@ impl Turn {
                 color: piece.color,
             })
             .collect())
+    }
+
+    // The isometry corresponding to the turn.
+    pub fn isometry(&self) -> Isometry {
+        Isometry::rotate_with(self.circle.center, self.rot)
     }
 }
 #[derive(Debug, Clone, Copy)]

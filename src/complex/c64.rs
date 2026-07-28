@@ -5,7 +5,6 @@ use std::{
 
 use approx_collections::ApproxEq;
 
-
 pub type Scalar = f64;
 
 ///complex number with f64 components. used for points and rotations
@@ -100,5 +99,10 @@ impl C64 {
     ///get the angle of a complex number
     pub fn angle(&self) -> Scalar {
         self.im.atan2(self.re)
+    }
+
+    /// Reciprocal of input. Panics if input is zero.
+    pub fn recip(self) -> Self {
+        (1.0 / self.mag_sq()) * self.conj()
     }
 }
