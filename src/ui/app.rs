@@ -3,7 +3,7 @@ use std::path::PathBuf;
 
 use crate::hps::data_storer::data_storer::DataStorer;
 use crate::puzzle::puzzle::*;
-use crate::ui::render::{OutlineStyle, draw_circle};
+use crate::ui::render::{CoordinateConverter, OutlineStyle, draw_circle};
 use crate::{DEF_PATH, DEFAULT_PUZZLE};
 use egui::*;
 
@@ -106,16 +106,15 @@ impl eframe::App for App {
         //run the ui of the program on a central panel
         egui::CentralPanel::default().show(ctx, |ui| {
             let rect = ui.available_rect_before_wrap(); //the space the program has to work with
+            let cc = CoordinateConverter {
+                rect,
+                scale_factor: self.scale_factor,
+                offset_pos: self.offset,
+            };
             if let Some(ref mut p) = self.puzzle {
                 if !self.preview {
                     //if the puzzle isnt being previewed, render it
-                    if let Err(x) = p.render(
-                        ui,
-                        &rect,
-                        self.outline_width,
-                        self.scale_factor,
-                        self.offset,
-                    ) {
+                    if let Err(x) = p.render(ui, cc, self.outline_width) {
                         self.curr_msg = x;
                     };
                     //if the puzzle is in preview mode, render all of the pieces of the solved state
@@ -124,11 +123,9 @@ impl eframe::App for App {
                         if let Err(x) = p.render_piece(
                             i,
                             ui,
-                            &rect,
+                            cc,
                             None,
                             self.outline_width,
-                            self.scale_factor,
-                            self.offset,
                             OutlineStyle::Filled,
                         ) {
                             self.curr_msg = x;
@@ -400,14 +397,7 @@ impl eframe::App for App {
                 && !self.preview
                 && let Some(pointer) = r.interact_pointer_pos()
                 && let Some(ref mut p) = self.puzzle
-                && let Err(x) = p.process_click(
-                    &rect,
-                    pointer,
-                    true,
-                    self.scale_factor,
-                    self.offset,
-                    self.cut_on_turn,
-                )
+                && let Err(x) = p.process_click(cc, pointer, true, self.cut_on_turn)
             {
                 {
                     self.curr_msg = x;
@@ -418,14 +408,7 @@ impl eframe::App for App {
                 && !self.preview
                 && let Some(pointer) = r.interact_pointer_pos()
                 && let Some(ref mut p) = self.puzzle
-                && let Err(x) = p.process_click(
-                    &rect,
-                    pointer,
-                    false,
-                    self.scale_factor,
-                    self.offset,
-                    self.cut_on_turn,
-                )
+                && let Err(x) = p.process_click(cc, pointer, false, self.cut_on_turn)
             {
                 self.curr_msg = x;
             }
@@ -470,19 +453,16 @@ impl eframe::App for App {
                     if !p.in_animation() {
                         // Block hovering if animation is active
                         // Shift held, highlight a piece
-                        let hovered_piece =
-                            p.get_hovered_piece(&rect, pointer, self.scale_factor, self.offset);
+                        let hovered_piece = p.get_hovered_piece(cc, pointer);
 
                         // Render the hovered outline on top of the normal outline
                         if let Some(hovered_piece) = hovered_piece {
                             if let Err(x) = p.render_piece(
                                 hovered_piece,
                                 ui,
-                                &rect,
+                                cc,
                                 None,
                                 self.outline_width,
-                                self.scale_factor,
-                                self.offset,
                                 OutlineStyle::Hovered,
                             ) {
                                 self.curr_msg = x;
@@ -505,14 +485,13 @@ impl eframe::App for App {
                     }
                 } else {
                     // No modifiers, render the circle
-                    let hovered_circle =
-                        p.get_hovered(&rect, pointer, self.scale_factor, self.offset);
+                    let hovered_circle = p.get_hovered(cc, pointer);
                     //get the hovered circle (turn circle)
                     if let Err(x) = &hovered_circle {
                         self.curr_msg = x.clone();
                     }
                     if let Ok(Some(real_circle)) = hovered_circle {
-                        draw_circle(real_circle, ui, &rect, self.scale_factor, self.offset);
+                        draw_circle(real_circle, ui, cc);
                     } //if a circle is hovered, highlight its border
                     //if a circle is being hovered and the scroll wheel is being used, parse the scroll like a click
                     //if the middle mouse button is pressed, or the control button is pressed, dont parse this input as these are camera commands
@@ -521,14 +500,7 @@ impl eframe::App for App {
                         && !ui.input(|i| i.modifiers.command_only())
                         && !self.preview
                         && let Some(pointer) = r.hover_pos()
-                        && let Err(x) = p.process_click(
-                            &rect,
-                            pointer,
-                            scroll > 0,
-                            self.scale_factor,
-                            self.offset,
-                            self.cut_on_turn,
-                        )
+                        && let Err(x) = p.process_click(cc, pointer, scroll > 0, self.cut_on_turn)
                     {
                         self.curr_msg = x;
                     }

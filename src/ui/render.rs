@@ -62,55 +62,57 @@ impl Color {
 }
 
 ///draws a the circumference of a circle given the coordinates
-pub fn draw_circle(real_circle: Circle, ui: &mut Ui, rect: &Rect, scale_factor: f32, offset: Vec2) {
+pub fn draw_circle(real_circle: Circle, ui: &mut Ui, cc: CoordinateConverter) {
     {
         ui.painter().circle_stroke(
-            real_circle.center.to_pos2(rect, scale_factor, offset),
-            real_circle.r() as f32 * scale_factor * (rect.width() / 1920.0),
+            real_circle.center.to_pos2(cc),
+            real_circle.r() as f32 * cc.scale_factor * (cc.rect.width() / 1920.0),
             (10.0, Color32::WHITE),
         );
     }
 }
 
+#[derive(Debug, Copy, Clone)]
+pub struct CoordinateConverter {
+    pub rect: Rect,
+    pub scale_factor: f32,
+    pub offset_pos: Vec2,
+}
+
 impl Point {
     ///translates from cga2d coords to egui coords
-    fn to_pos2(&self, rect: &Rect, scale_factor: f32, offset: Vec2) -> Pos2 {
+    fn to_pos2(&self, cc: CoordinateConverter) -> Pos2 {
         pos2(
-            (self.0.re as f32 + offset.x) * (scale_factor * rect.width() / 1920.0)
-                + (rect.width() / 2.0)
-                + rect.min.x,
-            -(self.0.im as f32 + offset.y) * (scale_factor * rect.width() / 1920.0)
-                + (rect.height() / 2.0)
-                + rect.min.y,
+            (self.0.re as f32 + cc.offset_pos.x) * (cc.scale_factor * cc.rect.width() / 1920.0)
+                + (cc.rect.width() / 2.0)
+                + cc.rect.min.x,
+            -(self.0.im as f32 + cc.offset_pos.y) * (cc.scale_factor * cc.rect.width() / 1920.0)
+                + (cc.rect.height() / 2.0)
+                + cc.rect.min.y,
         )
     }
     ///translates from egui coords to cga2d coords
-    fn from_pos2(pos: &Pos2, rect: &Rect, scale_factor: f32, offset: Vec2) -> Self {
+    fn from_pos2(pos: &Pos2, cc: CoordinateConverter) -> Self {
         Self(C64 {
-            re: (((pos.x - (rect.width() / 2.0)) * (1920.0 / (scale_factor * rect.width())))
-                - offset.x) as f64,
-            im: (((pos.y - (rect.height() / 2.0)) * (-1920.0 / (scale_factor * rect.width())))
-                - offset.y) as f64,
+            re: (((pos.x - (cc.rect.width() / 2.0))
+                * (1920.0 / (cc.scale_factor * cc.rect.width())))
+                - cc.offset_pos.x) as f64,
+            im: (((pos.y - (cc.rect.height() / 2.0))
+                * (-1920.0 / (cc.scale_factor * cc.rect.width())))
+                - cc.offset_pos.y) as f64,
         })
     }
 }
 
 impl Triangulation {
     ///render the triangulation, according to a detail and a color.
-    pub fn render_fill(
-        &self,
-        ui: &mut Ui,
-        rect: &Rect,
-        scale_factor: f32,
-        offset: Vec2,
-        color: Color32,
-    ) {
+    pub fn render_fill(&self, ui: &mut Ui, cc: CoordinateConverter, color: Color32) {
         let mut triangle_vertices: Vec<epaint::Vertex> = Vec::new(); //make a new vector of epaint vertices
         for triangle in &self.inside {
             //iterate over the triangles
             for point in triangle {
                 let vertex = epaint::Vertex {
-                    pos: point.to_pos2(rect, scale_factor, offset),
+                    pos: point.to_pos2(cc),
                     uv: pos2(0.0, 0.0),
                     color,
                 };
@@ -127,18 +129,14 @@ impl Triangulation {
     pub fn render_outlines(
         &self,
         ui: &mut Ui,
-        rect: &Rect,
-        scale_factor: f32,
-        offset: Vec2,
+        cc: CoordinateConverter,
         width: f32,
         color: Color32,
     ) {
         //now we render the outlines
         for arc in &self.border {
             ui.painter().add(PathShape::line(
-                arc.iter()
-                    .map(|x| x.to_pos2(rect, scale_factor, offset))
-                    .collect(),
+                arc.iter().map(|x| x.to_pos2(cc)).collect(),
                 Stroke::new(width, color),
             ));
         }
@@ -176,11 +174,9 @@ impl Puzzle {
         &self,
         index: usize,
         ui: &mut Ui,
-        rect: &Rect,
+        cc: CoordinateConverter,
         offset: Option<Turn>,
         outline_size: f32,
-        scale_factor: f32,
-        offset_pos: Vec2,
         outline_style: OutlineStyle,
     ) -> Result<(), String> {
         let Some(piece) = self.data.pieces.get(index) else {
@@ -220,13 +216,11 @@ impl Puzzle {
         for triangle in &true_piece.triangulations {
             //iterate over the triangles
             if matches!(outline_style, OutlineStyle::Filled) {
-                triangle.render_fill(ui, rect, scale_factor, offset_pos, color);
+                triangle.render_fill(ui, cc, color);
             }
             triangle.render_outlines(
                 ui,
-                rect,
-                scale_factor,
-                offset_pos,
+                cc,
                 outline_size * outline_style.width(),
                 outline_style.color(),
             );
@@ -240,10 +234,8 @@ impl Puzzle {
     pub fn render(
         &self,
         ui: &mut Ui,
-        rect: &Rect,
+        cc: CoordinateConverter,
         outline_width: f32,
-        scale_factor: f32,
-        offset: Vec2,
     ) -> Result<(), String> {
         //get the offset from the animation_offset and anim_left
         let proper_offset = self
@@ -254,11 +246,9 @@ impl Puzzle {
             self.render_piece(
                 i,
                 ui,
-                rect,
+                cc,
                 proper_offset,
                 outline_width,
-                scale_factor,
-                offset,
                 OutlineStyle::Filled,
             )?;
         }
@@ -271,14 +261,12 @@ impl Puzzle {
     ///'cut' is whether the turn should cut
     pub fn process_click(
         &mut self,
-        rect: &Rect,
+        cc: CoordinateConverter,
         pos: Pos2,
         left: bool,
-        scale_factor: f32,
-        offset: Vec2,
         cut: bool,
     ) -> Result<bool, String> {
-        let good_pos = Point::from_pos2(&pos, rect, scale_factor, offset); //the cga2d position of the click
+        let good_pos = Point::from_pos2(&pos, cc); //the cga2d position of the click
         let mut min_dist: f64 = 10000.0;
         let mut min_rad: f64 = 10000.0;
         let mut correct_id: String = String::from("");
@@ -315,12 +303,10 @@ impl Puzzle {
     ///picks amongst the valid turn circles of the puzzle
     pub fn get_hovered(
         &self,
-        rect: &Rect,
+        cc: CoordinateConverter,
         pos: Pos2,
-        scale_factor: f32,
-        offset: Vec2,
     ) -> Result<Option<Circle>, String> {
-        let good_pos = Point::from_pos2(&pos, rect, scale_factor, offset); //get the position
+        let good_pos = Point::from_pos2(&pos, cc); //get the position
         let mut min_dist: f64 = 10000.0;
         let mut min_rad: f64 = 10000.0;
         let mut correct_turn = None;
@@ -351,14 +337,8 @@ impl Puzzle {
     }
 
     /// The index of the currently hovered piece.
-    pub fn get_hovered_piece(
-        &self,
-        rect: &Rect,
-        pos: Pos2,
-        scale_factor: f32,
-        offset: Vec2,
-    ) -> Option<usize> {
-        let good_pos = Point::from_pos2(&pos, rect, scale_factor, offset); //get the position
+    pub fn get_hovered_piece(&self, cc: CoordinateConverter, pos: Pos2) -> Option<usize> {
+        let good_pos = Point::from_pos2(&pos, cc); //get the position
         self.data.pieces.iter().position(|piece| {
             matches!(
                 piece.piece.shape.contains(good_pos),
@@ -368,14 +348,8 @@ impl Puzzle {
     }
 
     /// The index of the currently hovered piece in the solved position.
-    pub fn get_hovered_solved_piece(
-        &self,
-        rect: &Rect,
-        pos: Pos2,
-        scale_factor: f32,
-        offset: Vec2,
-    ) -> Option<usize> {
-        let good_pos = Point::from_pos2(&pos, rect, scale_factor, offset); //get the position
+    pub fn get_hovered_solved_piece(&self, cc: CoordinateConverter, pos: Pos2) -> Option<usize> {
+        let good_pos = Point::from_pos2(&pos, cc); //get the position
         self.solved_data.pieces.iter().position(|piece| {
             matches!(
                 piece.piece.shape.contains(good_pos),
