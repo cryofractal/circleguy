@@ -4,8 +4,12 @@ use approx_collections::ApproxEq;
 
 use crate::{
     PRECISION,
-    complex::{arc::Arc, c64::C64, complex_circle::Contains, point::Point},
-    puzzle::{piece::Piece, piece_shape::PieceShape, turn::Turn},
+    complex::{arc::Arc, c64::C64, complex_circle::Contains, isometry::Isometry, point::Point},
+    puzzle::{
+        piece::Piece,
+        piece_shape::PieceShape,
+        turn::{CutResult, Turn},
+    },
 };
 
 ///the amount more detailed the outlines are than the interiors
@@ -34,6 +38,7 @@ pub type TriangulatedArc = Vec<Point>;
 pub struct RenderPiece {
     pub piece: Piece,
     pub triangulations: Vec<Triangulation>,
+    pub isometry: Isometry, // The isometry that maps the solved position to the current position.
 }
 
 ///make triangles from the border points, given a center
@@ -158,6 +163,7 @@ impl Piece {
                 .map(|x| x.triangulate_component(detail))
                 .collect(),
             piece: self,
+            isometry: Isometry::identity(),
         }
     }
 }
@@ -183,20 +189,27 @@ pub fn rot_triangulations(tri: Vec<Triangulation>, turn: Turn) -> Vec<Triangulat
 impl Turn {
     ///equivalent to turn_piece
     pub fn turn_render_piece(&self, piece: &RenderPiece) -> Option<RenderPiece> {
-        let (shape, triangles) = if piece.piece.shape.in_circle(self.circle)? != Contains::Outside {
-            (
-                self.rot_pieceshape(&piece.piece.shape),
-                rot_triangulations(piece.triangulations.clone(), *self),
-            )
-        } else {
-            (piece.piece.shape.clone(), piece.triangulations.clone())
-        };
+        let (shape, triangles, isometry) =
+            if piece.piece.shape.in_circle(self.circle)? != Contains::Outside {
+                (
+                    self.rot_pieceshape(&piece.piece.shape),
+                    rot_triangulations(piece.triangulations.clone(), *self),
+                    piece.isometry * self.isometry(),
+                )
+            } else {
+                (
+                    piece.piece.shape.clone(),
+                    piece.triangulations.clone(),
+                    piece.isometry,
+                )
+            };
         Some(RenderPiece {
             piece: Piece {
                 shape,
                 color: piece.piece.color,
             },
             triangulations: triangles,
+            isometry,
         })
     }
     ///equivalent to turn_cut_piece. retriangulates
@@ -204,12 +217,17 @@ impl Turn {
         &self,
         piece: &RenderPiece,
         detail: f64,
-    ) -> Result<Vec<RenderPiece>, String> {
-        let cut_pieces = self.turn_cut_piece(&piece.piece)?;
-        let mut returns = Vec::new();
-        for cut_piece in cut_pieces {
-            returns.push(cut_piece.triangulate(detail));
-        }
-        Ok(returns)
+    ) -> Result<CutResult<RenderPiece>, String> {
+        Ok(self
+            .turn_cut_piece(&piece.piece)?
+            .map_inside(|cut_piece, inside| {
+                let mut new_piece = cut_piece.triangulate(detail);
+                new_piece.isometry = if inside {
+                    piece.isometry * self.isometry()
+                } else {
+                    piece.isometry
+                };
+                new_piece
+            }))
     }
 }

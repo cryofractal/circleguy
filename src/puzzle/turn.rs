@@ -17,6 +17,49 @@ pub struct Turn {
     pub rot: Rotation, //rotation is stored as a mag-1 complex number
 }
 
+/// The inside and outside halves of something that may have been cut.
+#[derive(Clone, Debug)]
+pub struct CutResult<P> {
+    pub inside: Option<P>,
+    pub outside: Option<P>,
+}
+
+impl<P> CutResult<P> {
+    /// A `CutResult` with references to the original's data.
+    pub fn as_refs(&self) -> CutResult<&P> {
+        CutResult {
+            inside: self.inside.as_ref(),
+            outside: self.outside.as_ref(),
+        }
+    }
+
+    /// Apply a function to both halves of the object.
+    pub fn map<Q>(self, f: impl Fn(P) -> Q) -> CutResult<Q> {
+        CutResult {
+            inside: self.inside.map(&f),
+            outside: self.outside.map(&f),
+        }
+    }
+
+    /// Apply a function to both halves of the object.
+    pub fn map_inside<Q>(self, f: impl Fn(P, bool) -> Q) -> CutResult<Q> {
+        CutResult {
+            inside: self.inside.map(|p| f(p, true)),
+            outside: self.outside.map(|p| f(p, false)),
+        }
+    }
+}
+
+impl<P> IntoIterator for CutResult<P> {
+    type Item = P;
+
+    type IntoIter = std::iter::Flatten<std::array::IntoIter<Option<P>, 2>>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        [self.inside, self.outside].into_iter().flatten()
+    }
+}
+
 impl Turn {
     ///take the inverse of a turn, which is around the same circle but with flipped sign on the angle
     pub fn inverse(&self) -> Self {
@@ -76,16 +119,25 @@ impl Turn {
     }
     ///turn a pieceshape according to the turn, with cutting. returns 1 or 2 pieces.
     ///if two shapes are returned, a cut was made and exactly one of the two shape was rotated.
-    pub fn turn_cut_pieceshape(&self, shape: &PieceShape) -> Result<Vec<PieceShape>, String> {
+    pub fn turn_cut_pieceshape(&self, shape: &PieceShape) -> Result<CutResult<PieceShape>, String> {
         match shape.in_circle(self.circle) {
             None => {
                 let (i, o) = shape
                     .cut_by_circle(self.circle)
                     .ok_or("Turn.turn_cut_pieceshape failed: shape crossed cut but was not cut!")?;
-                Ok(vec![self.rot_pieceshape(&i), o])
+                Ok(CutResult {
+                    inside: Some(self.rot_pieceshape(&i)),
+                    outside: Some(o),
+                })
             }
-            Some(Contains::Inside) | Some(Contains::Border) => Ok(vec![self.rot_pieceshape(shape)]),
-            Some(Contains::Outside) => Ok(vec![shape.clone()]),
+            Some(Contains::Inside) | Some(Contains::Border) => Ok(CutResult {
+                inside: Some(self.rot_pieceshape(shape)),
+                outside: None,
+            }),
+            Some(Contains::Outside) => Ok(CutResult {
+                inside: None,
+                outside: Some(shape.clone()),
+            }),
         }
     }
     ///turn a piece according to the turn, without cutting. see turn_pieceshape().
@@ -96,15 +148,11 @@ impl Turn {
         })
     }
     ///turn a piece according to the turn, with cutting. see turn_cut_pieceshape().
-    pub fn turn_cut_piece(&self, piece: &Piece) -> Result<Vec<Piece>, String> {
-        Ok(self
-            .turn_cut_pieceshape(&piece.shape)?
-            .iter()
-            .map(|x| Piece {
-                shape: x.clone(),
-                color: piece.color,
-            })
-            .collect())
+    pub fn turn_cut_piece(&self, piece: &Piece) -> Result<CutResult<Piece>, String> {
+        Ok(self.turn_cut_pieceshape(&piece.shape)?.map(|x| Piece {
+            shape: x.clone(),
+            color: piece.color,
+        }))
     }
 
     // The isometry corresponding to the turn.
@@ -139,7 +187,7 @@ impl OrderedTurn {
     pub fn turn_piece(&self, piece: &Piece) -> Option<Piece> {
         self.turn.turn_piece(piece)
     }
-    pub fn turn_cut_piece(&self, piece: &Piece) -> Result<Vec<Piece>, String> {
+    pub fn turn_cut_piece(&self, piece: &Piece) -> Result<CutResult<Piece>, String> {
         self.turn.turn_cut_piece(piece)
     }
 }
