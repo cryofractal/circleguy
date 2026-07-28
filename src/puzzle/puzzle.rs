@@ -24,7 +24,7 @@ pub struct PuzzleData {
     pub name: String,
     pub path: PathBuf,
     pub authors: Vec<String>,
-    pub pieces: Vec<RenderPiece>,
+    pub pieces: Vec<RenderPiece>, // Make sure these aren't reordered
     pub turns: HashMap<String, OrderedTurn>,
     pub intern: FloatPool,
     pub depth: usize,
@@ -54,13 +54,19 @@ impl Puzzle {
     pub fn turn(&mut self, turn: OrderedTurn, cut: bool) -> Result<bool, String> {
         let mut new_pieces = Vec::new(); //make a list of new pieces to populate
         if cut {
+            let mut cut_pieces = Vec::new(); // Pieces that go on the end of the list
             //if cut is true, cut
             for piece in &self.data.pieces {
-                for turned in turn.turn.turn_cut_render_piece(piece, DETAIL)? {
-                    //cut each piece
+                //cut each piece
+                let mut turned_iter = turn.turn.turn_cut_render_piece(piece, DETAIL)?.into_iter();
+                if let Some(turned) = turned_iter.next() {
                     new_pieces.push(turned); //add it to the list
+                    if let Some(turned) = turned_iter.next() {
+                        cut_pieces.push(turned); //add it to the list
+                    }
                 }
             }
+            new_pieces.extend(cut_pieces);
         } else {
             for piece in &self.data.pieces {
                 new_pieces.push(match turn.turn.turn_render_piece(piece) {
