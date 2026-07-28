@@ -32,6 +32,7 @@ pub struct App {
     offset: Vec2,                    //the offset of the puzzle from the center of the screen (pan)
     cut_on_turn: bool,               //whether or not turns should cut the puzzle
     preview: bool,                   //whether the solved state is being previewed
+    mouse_function: MouseFunction,   // Current hover function
 }
 impl App {
     ///initialize a new app, using some default settings (from the constants)
@@ -76,6 +77,7 @@ impl App {
             offset: vec2(0.0, 0.0),
             cut_on_turn: false,
             preview: false,
+            mouse_function: MouseFunction::Normal,
             // keybinds: if let Some(kb) = &p_data.keybinds
             //     && let Some(gr) = &p_data.keybind_groups
             //     && let Some(keybinds) = load_keybinds(&kb, &gr)
@@ -87,6 +89,18 @@ impl App {
         }
     }
 }
+
+#[derive(Debug, Copy, Clone)]
+pub enum MouseFunction {
+    Normal,
+    Super(SuperMouseFunction),
+}
+
+#[derive(Debug, Copy, Clone)]
+pub enum SuperMouseFunction {
+    OrientationColor,
+}
+
 impl eframe::App for App {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         //run the ui of the program on a central panel
@@ -106,15 +120,15 @@ impl eframe::App for App {
                     };
                     //if the puzzle is in preview mode, render all of the pieces of the solved state
                 } else {
-                    for piece in &p.solved_data.pieces {
-                        if let Err(x) = piece.render(
+                    for i in 0..p.solved_data.pieces.len() {
+                        if let Err(x) = p.render_piece(
+                            i,
                             ui,
                             &rect,
                             None,
                             self.outline_width,
                             self.scale_factor,
                             self.offset,
-                            p.super_data.as_ref(),
                             OutlineStyle::Filled,
                         ) {
                             self.curr_msg = x;
@@ -305,6 +319,30 @@ impl eframe::App for App {
                         ui.label(String::from("Authors: ") + &p.data.authors.join(", "));
                         ui.label(p.data.pieces.len().to_string() + " pieces");
                     });
+
+                if let Some(super_data) = &mut p.super_data {
+                    Window::new("Super Data")
+                        .default_pos((10.0, 200.0))
+                        .auto_sized()
+                        .show(ctx, |ui| {
+                            if matches!(
+                                self.mouse_function,
+                                MouseFunction::Super(SuperMouseFunction::OrientationColor)
+                            ) {
+                                if ui.button(String::from("Move mode")).clicked() {
+                                    self.mouse_function = MouseFunction::Normal;
+                                };
+                            } else {
+                                if ui
+                                    .button(String::from("Orientation color toggle mode"))
+                                    .clicked()
+                                {
+                                    self.mouse_function =
+                                        MouseFunction::Super(SuperMouseFunction::OrientationColor);
+                                };
+                            }
+                        });
+                }
             }
             //UI Section: Bottom left area
             ui.with_layout(egui::Layout::bottom_up(egui::Align::LEFT), |ui| {
@@ -436,20 +474,32 @@ impl eframe::App for App {
                             p.get_hovered_piece(&rect, pointer, self.scale_factor, self.offset);
 
                         // Render the hovered outline on top of the normal outline
-                        if let Some(hovered_piece) = hovered_piece
-                            && let Some(piece) = p.data.pieces.get(hovered_piece)
-                        {
-                            if let Err(x) = piece.render(
+                        if let Some(hovered_piece) = hovered_piece {
+                            if let Err(x) = p.render_piece(
+                                hovered_piece,
                                 ui,
                                 &rect,
                                 None,
                                 self.outline_width,
                                 self.scale_factor,
                                 self.offset,
-                                p.super_data.as_ref(),
                                 OutlineStyle::Hovered,
                             ) {
                                 self.curr_msg = x;
+                            }
+
+                            match self.mouse_function {
+                                MouseFunction::Normal => {}
+                                MouseFunction::Super(mf) => {
+                                    if let Some(super_data) = p.super_data.as_mut() {
+                                        match mf {
+                                            SuperMouseFunction::OrientationColor => {
+                                                super_data
+                                                    .toggle_orientation_colored(hovered_piece);
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         }
                     }

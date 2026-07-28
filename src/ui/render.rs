@@ -9,9 +9,7 @@ use crate::hps::data_storer::data_storer::PuzzleLoadingData;
 use crate::hps::data_storer::def_entry::DefEntry;
 use crate::puzzle::color::Color;
 use crate::puzzle::puzzle::*;
-use crate::puzzle::render_piece::RenderPiece;
 use crate::puzzle::render_piece::Triangulation;
-use crate::puzzle::super_data::SuperData;
 use crate::puzzle::turn::*;
 use approx_collections::*;
 use core::f64;
@@ -173,21 +171,25 @@ impl OutlineStyle {
 }
 
 ///render a piece, with an outline
-impl RenderPiece {
-    pub fn render(
+impl Puzzle {
+    pub fn render_piece(
         &self,
+        index: usize,
         ui: &mut Ui,
         rect: &Rect,
         offset: Option<Turn>,
         outline_size: f32,
         scale_factor: f32,
         offset_pos: Vec2,
-        super_data: Option<&SuperData>,
         outline_style: OutlineStyle,
     ) -> Result<(), String> {
+        let Some(piece) = self.data.pieces.get(index) else {
+            return Ok(());
+        };
+
         //get the offset of the piece, base on if its in the animation_offset circle
         let true_offset = if offset.is_none()
-            || self.piece.shape.in_circle(offset.unwrap().circle)
+            || piece.piece.shape.in_circle(offset.unwrap().circle)
                 == Some(crate::complex::complex_circle::Contains::Inside)
         {
             offset
@@ -196,19 +198,23 @@ impl RenderPiece {
         };
         let true_piece = if let Some(twist) = true_offset {
             //turn the piece around the offset
-            twist.turn_render_piece(self).unwrap_or(self.clone())
+            twist.turn_render_piece(piece).unwrap_or(piece.clone())
         } else {
-            self.clone()
+            piece.clone()
         };
 
-        let color = match super_data {
+        let color = match &self.super_data {
             Some(super_data) => {
-                // TODO: rendering goes here
-                let colorous::Color { r, g, b } = colorous::RAINBOW
-                    .eval_continuous((self.isometry.rotation_angle() / (2.0 * PI) + 2.0).fract()); // make sure it's in the range 0.0..1.0
-                Color32::from_rgb(r, g, b)
+                if super_data.orientation_colored.contains(&index) {
+                    let colorous::Color { r, g, b } = colorous::RAINBOW.eval_continuous(
+                        (piece.isometry.rotation_angle() / (2.0 * PI) + 2.0).fract(),
+                    ); // make sure it's in the range 0.0..1.0
+                    Color32::from_rgb(r, g, b)
+                } else {
+                    Color32::DARK_GRAY
+                }
             }
-            None => self.piece.color.to_egui(),
+            None => piece.piece.color.to_egui(),
         };
 
         for triangle in &true_piece.triangulations {
@@ -243,16 +249,16 @@ impl Puzzle {
         let proper_offset = self
             .animation_offset
             .map(|off| off.mult(self.anim_left as f64));
-        for piece in &self.data.pieces {
+        for i in 0..self.data.pieces.len() {
             //render each piece
-            piece.render(
+            self.render_piece(
+                i,
                 ui,
                 rect,
                 proper_offset,
                 outline_width,
                 scale_factor,
                 offset,
-                self.super_data.as_ref(),
                 OutlineStyle::Filled,
             )?;
         }
