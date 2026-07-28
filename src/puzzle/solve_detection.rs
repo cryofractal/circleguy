@@ -1,4 +1,4 @@
-use crate::puzzle::render_piece::RenderPiece;
+use crate::{complex::isometry::Isometry, puzzle::render_piece::RenderPiece};
 use approx_collections::ApproxEq;
 
 use crate::{
@@ -20,8 +20,15 @@ pub fn same_pieces(first: &Vec<RenderPiece>, second: &Vec<RenderPiece>) -> bool 
 
 impl Puzzle {
     pub fn is_solved(&self) -> bool {
-        // TODO: this doesn't work
-        same_pieces(&self.data.pieces, &self.solved_data.pieces)
+        if self.is_super() {
+            self.data
+                .pieces
+                .iter()
+                .all(|piece| piece.isometry.approx_eq(&Isometry::identity(), PRECISION))
+        } else {
+            // TODO: this doesn't work
+            same_pieces(&self.data.pieces, &self.solved_data.pieces)
+        }
     }
 }
 
