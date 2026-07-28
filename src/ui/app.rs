@@ -3,7 +3,7 @@ use std::path::PathBuf;
 
 use crate::hps::data_storer::data_storer::DataStorer;
 use crate::puzzle::puzzle::*;
-use crate::ui::render::draw_circle;
+use crate::ui::render::{OutlineStyle, draw_circle};
 use crate::{DEF_PATH, DEFAULT_PUZZLE};
 use egui::*;
 
@@ -115,12 +115,14 @@ impl eframe::App for App {
                             self.scale_factor,
                             self.offset,
                             p.super_data.as_ref(),
+                            OutlineStyle::Filled,
                         ) {
                             self.curr_msg = x;
                         }
                     }
                 }
             }
+
             //render the data storer panel -- this stores all of the puzzles that you can load
             if let Some(ref mut ds) = self.data_storer {
                 match ds.render_panel(ctx) {
@@ -426,31 +428,60 @@ impl eframe::App for App {
                 && !self.preview
                 && let Some(pointer) = r.hover_pos()
             {
-                let hovered_circle = p.get_hovered(&rect, pointer, self.scale_factor, self.offset);
-                //get the hovered circle (turn circle)
-                if let Err(x) = &hovered_circle {
-                    self.curr_msg = x.clone();
-                }
-                if let Ok(Some(real_circle)) = hovered_circle {
-                    draw_circle(real_circle, ui, &rect, self.scale_factor, self.offset);
-                } //if a circle is hovered, highlight its border
-                //if a circle is being hovered and the scroll wheel is being used, parse the scroll like a click
-                //if the middle mouse button is pressed, or the control button is pressed, dont parse this input as these are camera commands
-                if scroll != 0
-                    && !r.dragged_by(egui::PointerButton::Middle)
-                    && !ui.input(|i| i.modifiers.command_only())
-                    && !self.preview
-                    && let Some(pointer) = r.hover_pos()
-                    && let Err(x) = p.process_click(
-                        &rect,
-                        pointer,
-                        scroll > 0,
-                        self.scale_factor,
-                        self.offset,
-                        self.cut_on_turn,
-                    )
-                {
-                    self.curr_msg = x;
+                if ctx.input(|i| i.modifiers.shift) {
+                    if !p.in_animation() {
+                        // Block hovering if animation is active
+                        // Shift held, highlight a piece
+                        let hovered_piece =
+                            p.get_hovered_piece(&rect, pointer, self.scale_factor, self.offset);
+
+                        // Render the hovered outline on top of the normal outline
+                        if let Some(hovered_piece) = hovered_piece
+                            && let Some(piece) = p.data.pieces.get(hovered_piece)
+                        {
+                            if let Err(x) = piece.render(
+                                ui,
+                                &rect,
+                                None,
+                                self.outline_width,
+                                self.scale_factor,
+                                self.offset,
+                                p.super_data.as_ref(),
+                                OutlineStyle::Hovered,
+                            ) {
+                                self.curr_msg = x;
+                            }
+                        }
+                    }
+                } else {
+                    // No modifiers, render the circle
+                    let hovered_circle =
+                        p.get_hovered(&rect, pointer, self.scale_factor, self.offset);
+                    //get the hovered circle (turn circle)
+                    if let Err(x) = &hovered_circle {
+                        self.curr_msg = x.clone();
+                    }
+                    if let Ok(Some(real_circle)) = hovered_circle {
+                        draw_circle(real_circle, ui, &rect, self.scale_factor, self.offset);
+                    } //if a circle is hovered, highlight its border
+                    //if a circle is being hovered and the scroll wheel is being used, parse the scroll like a click
+                    //if the middle mouse button is pressed, or the control button is pressed, dont parse this input as these are camera commands
+                    if scroll != 0
+                        && !r.dragged_by(egui::PointerButton::Middle)
+                        && !ui.input(|i| i.modifiers.command_only())
+                        && !self.preview
+                        && let Some(pointer) = r.hover_pos()
+                        && let Err(x) = p.process_click(
+                            &rect,
+                            pointer,
+                            scroll > 0,
+                            self.scale_factor,
+                            self.offset,
+                            self.cut_on_turn,
+                        )
+                    {
+                        self.curr_msg = x;
+                    }
                 }
             }
             //if the middle mouse button is being pressed, pan the camera

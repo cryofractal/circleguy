@@ -32,10 +32,6 @@ pub struct RenderingCircle {
     pub rad: f32,
 }
 
-///the default rendering color
-///the color of the outlines
-const OUTLINE_COLOR: Color32 = Color32::BLACK;
-
 impl Color {
     pub fn to_egui(&self) -> Color32 {
         match self {
@@ -102,14 +98,13 @@ impl Point {
 }
 
 impl Triangulation {
-    ///render the triangulation, according to a detail and a color. includes outlines
-    pub fn render(
+    ///render the triangulation, according to a detail and a color.
+    pub fn render_fill(
         &self,
         ui: &mut Ui,
         rect: &Rect,
         scale_factor: f32,
         offset: Vec2,
-        width: f32,
         color: Color32,
     ) {
         let mut triangle_vertices: Vec<epaint::Vertex> = Vec::new(); //make a new vector of epaint vertices
@@ -128,15 +123,51 @@ impl Triangulation {
         mesh.indices = (0..(triangle_vertices.len() as u32)).collect();
         mesh.vertices = triangle_vertices; //add all the vertices
         ui.painter().add(egui::Shape::Mesh(mesh.into())); //paint the triangles
+    }
 
+    ///render the outlines of the triangulation, according to a detail and a color.
+    pub fn render_outlines(
+        &self,
+        ui: &mut Ui,
+        rect: &Rect,
+        scale_factor: f32,
+        offset: Vec2,
+        width: f32,
+        color: Color32,
+    ) {
         //now we render the outlines
         for arc in &self.border {
             ui.painter().add(PathShape::line(
                 arc.iter()
                     .map(|x| x.to_pos2(rect, scale_factor, offset))
                     .collect(),
-                Stroke::new(width, OUTLINE_COLOR),
+                Stroke::new(width, color),
             ));
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum OutlineStyle {
+    Filled,
+    Normal,
+    Hovered,
+}
+
+impl OutlineStyle {
+    pub fn width(self) -> f32 {
+        match self {
+            OutlineStyle::Filled => 1.0,
+            OutlineStyle::Normal => 1.0,
+            OutlineStyle::Hovered => 2.0,
+        }
+    }
+
+    pub fn color(self) -> Color32 {
+        match self {
+            OutlineStyle::Filled => Color32::BLACK,
+            OutlineStyle::Normal => Color32::BLACK,
+            OutlineStyle::Hovered => Color32::from_rgb(210, 210, 210),
         }
     }
 }
@@ -152,6 +183,7 @@ impl RenderPiece {
         scale_factor: f32,
         offset_pos: Vec2,
         super_data: Option<&SuperData>,
+        outline_style: OutlineStyle,
     ) -> Result<(), String> {
         //get the offset of the piece, base on if its in the animation_offset circle
         let true_offset = if offset.is_none()
@@ -181,11 +213,22 @@ impl RenderPiece {
 
         for triangle in &true_piece.triangulations {
             //iterate over the triangles
-            triangle.render(ui, rect, scale_factor, offset_pos, outline_size, color);
+            if matches!(outline_style, OutlineStyle::Filled) {
+                triangle.render_fill(ui, rect, scale_factor, offset_pos, color);
+            }
+            triangle.render_outlines(
+                ui,
+                rect,
+                scale_factor,
+                offset_pos,
+                outline_size * outline_style.width(),
+                outline_style.color(),
+            );
         }
         Ok(())
     }
 }
+
 impl Puzzle {
     ///render the puzzle, including outlines
     pub fn render(
@@ -210,6 +253,7 @@ impl Puzzle {
                 scale_factor,
                 offset,
                 self.super_data.as_ref(),
+                OutlineStyle::Filled,
             )?;
         }
         Ok(())
@@ -298,6 +342,40 @@ impl Puzzle {
             .turn
             .circle,
         ))
+    }
+
+    /// The index of the currently hovered piece.
+    pub fn get_hovered_piece(
+        &self,
+        rect: &Rect,
+        pos: Pos2,
+        scale_factor: f32,
+        offset: Vec2,
+    ) -> Option<usize> {
+        let good_pos = Point::from_pos2(&pos, rect, scale_factor, offset); //get the position
+        self.data.pieces.iter().position(|piece| {
+            matches!(
+                piece.piece.shape.contains(good_pos),
+                Contains::Inside | Contains::Border
+            )
+        })
+    }
+
+    /// The index of the currently hovered piece in the solved position.
+    pub fn get_hovered_solved_piece(
+        &self,
+        rect: &Rect,
+        pos: Pos2,
+        scale_factor: f32,
+        offset: Vec2,
+    ) -> Option<usize> {
+        let good_pos = Point::from_pos2(&pos, rect, scale_factor, offset); //get the position
+        self.solved_data.pieces.iter().position(|piece| {
+            matches!(
+                piece.piece.shape.contains(good_pos),
+                Contains::Inside | Contains::Border
+            )
+        })
     }
 }
 

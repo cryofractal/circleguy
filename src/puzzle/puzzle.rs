@@ -156,4 +156,9 @@ impl Puzzle {
     pub fn is_super(&self) -> bool {
         self.super_data.is_some()
     }
+
+    /// Is the puzzle in an animation right now
+    pub fn in_animation(&self) -> bool {
+        self.animation_offset.is_some() && self.anim_left > 0.0
+    }
 }
