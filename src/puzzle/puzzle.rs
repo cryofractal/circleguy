@@ -1,5 +1,4 @@
 use crate::DETAIL;
-use crate::puzzle::piece::*;
 use crate::puzzle::render_piece::RenderPiece;
 use crate::puzzle::turn::*;
 use approx_collections::FloatPool;
@@ -32,7 +31,7 @@ pub struct PuzzleData {
     pub name: String,
     pub path: PathBuf,
     pub authors: Vec<String>,
-    pub pieces: Vec<Piece>,
+    pub pieces: Vec<RenderPiece>,
     pub turns: HashMap<String, OrderedTurn>,
     pub intern: FloatPool,
     pub depth: usize,
@@ -44,11 +43,7 @@ impl Puzzle {
         Self {
             name: data.name.clone(),
             authors: data.authors.clone(),
-            pieces: data
-                .pieces
-                .iter()
-                .map(|x| x.clone().triangulate(DETAIL))
-                .collect(),
+            pieces: data.pieces.clone(),
             turns: data.turns.clone(),
             stack: vec![],
             scramble: None,
@@ -58,11 +53,7 @@ impl Puzzle {
             solved: true,
             anim_left: 0.0,
             keybinds: data.keybinds.clone(),
-            solved_state: data
-                .pieces
-                .iter()
-                .map(|x| x.clone().triangulate(DETAIL))
-                .collect(),
+            solved_state: data.pieces.clone(),
             data,
         }
     }

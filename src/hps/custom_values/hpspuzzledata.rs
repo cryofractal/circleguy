@@ -1,3 +1,4 @@
+use crate::DETAIL;
 use std::{collections::HashMap, f64::consts::PI, path::PathBuf};
 
 use approx_collections::FloatPool;
@@ -69,7 +70,11 @@ impl HPSPuzzleData {
         PuzzleData {
             name: self.name.clone(),
             authors: self.authors.clone(),
-            pieces: self.pieces.clone(),
+            pieces: self
+                .pieces
+                .iter()
+                .map(|x| x.clone().triangulate(DETAIL))
+                .collect(),
             turns: self.turns.clone(),
             intern: self.intern.clone(),
             depth: self.scramble,

@@ -1,8 +1,9 @@
+use crate::puzzle::render_piece::RenderPiece;
 use approx_collections::ApproxEq;
 
 use crate::{
     PRECISION,
-    puzzle::{piece::Piece, piece_shape::PieceShape, puzzle::Puzzle},
+    puzzle::{piece_shape::PieceShape, puzzle::Puzzle},
 };
 
 impl ApproxEq for PieceShape {
@@ -11,18 +12,15 @@ impl ApproxEq for PieceShape {
     }
 }
 
-pub fn same_pieces(first: &Vec<Piece>, second: &Vec<Piece>) -> bool {
+pub fn same_pieces(first: &Vec<RenderPiece>, second: &Vec<RenderPiece>) -> bool {
     compare_vecs(first, second, |x, y| {
-        x.color == y.color && x.shape.approx_eq(&y.shape, PRECISION)
+        x.piece.color == y.piece.color && x.piece.shape.approx_eq(&y.piece.shape, PRECISION)
     })
 }
 
 impl Puzzle {
     pub fn is_solved(&self) -> bool {
-        same_pieces(
-            &self.pieces.iter().map(|x| x.piece.clone()).collect(),
-            &self.data.pieces,
-        )
+        same_pieces(&self.pieces, &self.data.pieces)
     }
 }
 
