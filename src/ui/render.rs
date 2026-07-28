@@ -16,7 +16,9 @@ use crate::puzzle::turn::*;
 use approx_collections::*;
 use core::f64;
 use egui::FontId;
+use egui::Popup;
 use egui::RichText;
+use egui::response;
 use egui::{
     Color32, Pos2, Rect, Stroke, Ui, Vec2,
     epaint::{self, PathShape},
@@ -322,21 +324,32 @@ impl DataStorer {
         fn render_def_entry(entry: &DefEntry, ui: &mut Ui) -> Option<PuzzleLoadingDataWithMode> {
             match entry {
                 DefEntry::Def(data) => {
-                    let button = ui.add(egui::Button::new(data.name.clone()));
-                    if button.clicked() {
-                        Some(PuzzleLoadingDataWithMode {
-                            data: data.clone(),
-                            is_super: false,
-                        })
-                    } else if button.secondary_clicked() {
-                        println!("super");
-                        Some(PuzzleLoadingDataWithMode {
-                            data: data.clone(),
-                            is_super: true,
-                        })
+                    let response = ui.add(egui::Button::new(data.name.clone()));
+
+                    let context_response = Popup::context_menu(&response)
+                        .close_behavior(egui::PopupCloseBehavior::CloseOnClick)
+                        .show(|ui| {
+                            if ui.button("Standard mode").clicked() {
+                                return Some(false);
+                            }
+                            if ui.button("Super mode").clicked() {
+                                return Some(true);
+                            }
+                            None
+                        });
+
+                    let is_super = if let Some(context_response) = context_response {
+                        context_response.inner?
+                    } else if response.clicked() {
+                        false
                     } else {
-                        None
-                    }
+                        return None;
+                    };
+
+                    Some(PuzzleLoadingDataWithMode {
+                        data: data.clone(),
+                        is_super,
+                    })
                 }
                 DefEntry::Folder((name, dirs)) => {
                     if let Some(x) = ui
