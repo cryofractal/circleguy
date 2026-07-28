@@ -11,20 +11,13 @@ use std::hash::Hasher;
 use std::path::PathBuf;
 #[derive(Debug, Clone)]
 pub struct Puzzle {
-    pub name: String,
-    pub authors: Vec<String>,
-    pub pieces: Vec<RenderPiece>,
-    pub turns: HashMap<String, OrderedTurn>,
+    pub data: PuzzleData,
     pub stack: Vec<(String, isize)>,
     pub scramble: Option<Vec<String>>,
     pub animation_offset: Option<Turn>, //the turn of the puzzle that the animation is currently doing
-    pub intern: FloatPool,
-    pub depth: usize,
     pub solved: bool,
     pub anim_left: f32, //the amount of animation left
-    pub data: PuzzleData,
-    pub keybinds: HashMap<egui::Key, (String, isize)>,
-    pub solved_state: Vec<RenderPiece>,
+    pub solved_data: PuzzleData,
 }
 #[derive(Debug, Clone)]
 pub struct PuzzleData {
@@ -41,20 +34,13 @@ pub struct PuzzleData {
 impl Puzzle {
     pub fn new(data: PuzzleData) -> Self {
         Self {
-            name: data.name.clone(),
-            authors: data.authors.clone(),
-            pieces: data.pieces.clone(),
-            turns: data.turns.clone(),
+            data: data.clone(),
             stack: vec![],
             scramble: None,
             animation_offset: None,
-            intern: data.intern.clone(),
-            depth: data.depth,
             solved: true,
             anim_left: 0.0,
-            keybinds: data.keybinds.clone(),
-            solved_state: data.pieces.clone(),
-            data,
+            solved_data: data,
         }
     }
     ///checks if self is solved and updates self.is_solved accordingly
@@ -69,21 +55,21 @@ impl Puzzle {
         let mut new_pieces = Vec::new(); //make a list of new pieces to populate
         if cut {
             //if cut is true, cut
-            for piece in &self.pieces {
+            for piece in &self.data.pieces {
                 for turned in turn.turn.turn_cut_render_piece(piece, DETAIL)? {
                     //cut each piece
                     new_pieces.push(turned); //add it to the list
                 }
             }
         } else {
-            for piece in &self.pieces {
+            for piece in &self.data.pieces {
                 new_pieces.push(match turn.turn.turn_render_piece(piece) {
                     None => return Ok(false),
                     Some(x) => x,
                 }); //otherwise, just turn each piece
             }
         }
-        self.pieces = new_pieces;
+        self.data.pieces = new_pieces;
         self.anim_left = 1.0; //set the animation to run
         self.animation_offset = Some(turn.turn.inverse());
         self.intern_all(); //intern everything
@@ -96,6 +82,7 @@ impl Puzzle {
     ///if an error was encountered, returns Err(e) where e was the error
     pub fn turn_id(&mut self, id: &str, cut: bool, mult: isize) -> Result<bool, String> {
         let turn = self
+            .data
             .turns
             .get(id)
             .ok_or("No turn found with ID!".to_string())?
@@ -112,7 +99,7 @@ impl Puzzle {
     ///Err(e) means that an error was encountered
     pub fn undo(&mut self) -> Result<bool, String> {
         if let Some(last) = &self.stack.pop() {
-            let last_turn = self.turns[&last.0]; //try to find the last turn
+            let last_turn = self.data.turns[&last.0]; //try to find the last turn
             if !self.turn(last_turn.inverse().mult(last.1), false)? {
                 return Err(String::from("Puzzle.undo failed: undo turn was bandaged!"));
             };
@@ -135,15 +122,16 @@ impl Puzzle {
                 .try_into()
                 .expect("error casting [[u8; 8]; 4] to [u8; 32]"),
         );
-        for _ in 0..self.depth {
+        for _ in 0..self.data.depth {
             //choose a random turn and do it
             let key = self
+                .data
                 .turns
                 .keys()
                 .choose(&mut rng)
                 .ok_or("Puzzle.scramble failed: rng choosing a turn failed!".to_string())?
                 .clone();
-            self.turn(self.turns[&key], cut)?;
+            self.turn(self.data.turns[&key], cut)?;
             scramble.push(key);
         }
         self.animation_offset = None;
@@ -152,7 +140,7 @@ impl Puzzle {
     }
     ///reset the puzzle, using the stored definition
     pub fn reset(&mut self) -> Result<(), String> {
-        *self = Puzzle::new(self.data.clone());
+        *self = Puzzle::new(self.solved_data.clone());
         Ok(())
     }
 }

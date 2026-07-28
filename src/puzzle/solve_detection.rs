@@ -20,7 +20,8 @@ pub fn same_pieces(first: &Vec<RenderPiece>, second: &Vec<RenderPiece>) -> bool 
 
 impl Puzzle {
     pub fn is_solved(&self) -> bool {
-        same_pieces(&self.pieces, &self.data.pieces)
+        // TODO: this doesn't work
+        same_pieces(&self.data.pieces, &self.solved_data.pieces)
     }
 }
 

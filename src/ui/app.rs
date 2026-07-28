@@ -106,7 +106,7 @@ impl eframe::App for App {
                     };
                     //if the puzzle is in preview mode, render all of the pieces of the solved state
                 } else {
-                    for piece in &p.solved_state {
+                    for piece in &p.solved_data.pieces {
                         if let Err(x) = piece.render(
                             ui,
                             &rect,
@@ -296,9 +296,9 @@ impl eframe::App for App {
                     .default_pos((10.0, 40.0))
                     .auto_sized()
                     .show(ctx, |ui| {
-                        ui.label(String::from("Name: ") + &p.name);
-                        ui.label(String::from("Authors: ") + &p.authors.join(", "));
-                        ui.label(p.pieces.len().to_string() + " pieces");
+                        ui.label(String::from("Name: ") + &p.data.name);
+                        ui.label(String::from("Authors: ") + &p.data.authors.join(", "));
+                        ui.label(p.data.pieces.len().to_string() + " pieces");
                     });
             }
             //UI Section: Bottom left area
@@ -407,8 +407,8 @@ impl eframe::App for App {
                     {
                         let b = if let Some(p) = physical_key { p } else { key };
                         if pressed
-                            && let Some((t, m)) = p.keybinds.get(&b).cloned()
-                            && p.turns.contains_key(&t)
+                            && let Some((t, m)) = p.data.keybinds.get(&b).cloned()
+                            && p.data.turns.contains_key(&t)
                         {
                             if let Err(x) = p.turn_id(&t, self.cut_on_turn, m) {
                                 self.curr_msg = x;

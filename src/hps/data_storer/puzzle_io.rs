@@ -14,8 +14,8 @@ pub struct PuzzleIOData {
 impl Puzzle {
     pub fn to_io_data(&self) -> PuzzleIOData {
         PuzzleIOData {
-            name: self.name.clone(),
-            path: self.data.path.clone(),
+            name: self.solved_data.name.clone(),
+            path: self.solved_data.path.clone(),
             scramble: self.scramble.clone(),
             stack: self.stack.clone(),
         }

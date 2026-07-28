@@ -192,7 +192,7 @@ impl Puzzle {
         let proper_offset = self
             .animation_offset
             .map(|off| off.mult(self.anim_left as f64));
-        for piece in &self.pieces {
+        for piece in &self.data.pieces {
             //render each piece
             piece.render(ui, rect, proper_offset, outline_width, scale_factor, offset)?;
         }
@@ -216,7 +216,7 @@ impl Puzzle {
         let mut min_dist: f64 = 10000.0;
         let mut min_rad: f64 = 10000.0;
         let mut correct_id: String = String::from("");
-        for turn in &self.turns {
+        for turn in &self.data.turns {
             //iterate over the turns to find the closest one
             let (center, radius) = (turn.1.turn.circle.center, turn.1.turn.circle.r());
             //compare how close they are
@@ -258,7 +258,7 @@ impl Puzzle {
         let mut min_dist: f64 = 10000.0;
         let mut min_rad: f64 = 10000.0;
         let mut correct_turn = None;
-        for turn in self.turns.clone().values() {
+        for turn in self.data.turns.clone().values() {
             //this algorithm proceeds very similarly to the process_click algorithm above
             let (cent, rad) = (turn.turn.circle.center, turn.turn.circle.r());
             if ((good_pos.dist(cent).approx_cmp(&min_dist, PRECISION) == Ordering::Less)

@@ -1,4 +1,3 @@
-
 use crate::{
     complex::complex_circle::{Circle, ComplexCircle, Contains, OrientedCircle},
     puzzle::{color::Color, piece_shape::PieceShape},
