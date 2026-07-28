@@ -1,5 +1,6 @@
 use crate::DETAIL;
 use crate::puzzle::render_piece::RenderPiece;
+use crate::puzzle::super_data::SuperData;
 use crate::puzzle::turn::*;
 use approx_collections::FloatPool;
 use rand::SeedableRng;
@@ -18,6 +19,7 @@ pub struct Puzzle {
     pub solved: bool,
     pub anim_left: f32, //the amount of animation left
     pub solved_data: PuzzleData,
+    pub super_data: Option<SuperData>,
 }
 #[derive(Debug, Clone)]
 pub struct PuzzleData {
@@ -32,7 +34,7 @@ pub struct PuzzleData {
 }
 
 impl Puzzle {
-    pub fn new(data: PuzzleData) -> Self {
+    pub fn new(data: PuzzleData, is_super: bool) -> Self {
         Self {
             data: data.clone(),
             stack: vec![],
@@ -41,6 +43,7 @@ impl Puzzle {
             solved: true,
             anim_left: 0.0,
             solved_data: data,
+            super_data: is_super.then_some(SuperData::new()),
         }
     }
     ///checks if self is solved and updates self.is_solved accordingly
@@ -146,7 +149,11 @@ impl Puzzle {
     }
     ///reset the puzzle, using the stored definition
     pub fn reset(&mut self) -> Result<(), String> {
-        *self = Puzzle::new(self.solved_data.clone());
+        *self = Puzzle::new(self.solved_data.clone(), self.is_super());
         Ok(())
+    }
+
+    pub fn is_super(&self) -> bool {
+        self.super_data.is_some()
     }
 }

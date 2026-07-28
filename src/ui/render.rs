@@ -11,6 +11,7 @@ use crate::puzzle::color::Color;
 use crate::puzzle::puzzle::*;
 use crate::puzzle::render_piece::RenderPiece;
 use crate::puzzle::render_piece::Triangulation;
+use crate::puzzle::super_data::SuperData;
 use crate::puzzle::turn::*;
 use approx_collections::*;
 use core::f64;
@@ -148,6 +149,7 @@ impl RenderPiece {
         outline_size: f32,
         scale_factor: f32,
         offset_pos: Vec2,
+        super_data: Option<&SuperData>,
     ) -> Result<(), String> {
         //get the offset of the piece, base on if its in the animation_offset circle
         let true_offset = if offset.is_none()
@@ -164,16 +166,18 @@ impl RenderPiece {
         } else {
             self.clone()
         };
+
+        let color = match super_data {
+            Some(super_data) => {
+                // TODO: rendering goes here
+                Color::Gray
+            }
+            None => self.piece.color,
+        };
+
         for triangle in &true_piece.triangulations {
             //iterate over the triangles
-            triangle.render(
-                ui,
-                rect,
-                scale_factor,
-                offset_pos,
-                outline_size,
-                self.piece.color,
-            );
+            triangle.render(ui, rect, scale_factor, offset_pos, outline_size, color);
         }
         Ok(())
     }
@@ -194,7 +198,15 @@ impl Puzzle {
             .map(|off| off.mult(self.anim_left as f64));
         for piece in &self.data.pieces {
             //render each piece
-            piece.render(ui, rect, proper_offset, outline_width, scale_factor, offset)?;
+            piece.render(
+                ui,
+                rect,
+                proper_offset,
+                outline_width,
+                scale_factor,
+                offset,
+                self.super_data.as_ref(),
+            )?;
         }
         Ok(())
     }
@@ -285,9 +297,18 @@ impl Puzzle {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct PuzzleLoadingDataWithMode {
+    pub data: PuzzleLoadingData,
+    pub is_super: bool,
+}
+
 impl DataStorer {
     ///render the data panel on the screen and read input for which button is clicked
-    pub fn render_panel(&mut self, ctx: &egui::Context) -> Result<Option<PuzzleLoadingData>, ()> {
+    pub fn render_panel(
+        &mut self,
+        ctx: &egui::Context,
+    ) -> Result<Option<PuzzleLoadingDataWithMode>, ()> {
         fn cmp_entries(a: &DefEntry, b: &DefEntry) -> Ordering {
             match (a, b) {
                 (DefEntry::Def(data_a), DefEntry::Def(data_b)) => {
@@ -298,11 +319,21 @@ impl DataStorer {
                 (DefEntry::Folder((na, _)), DefEntry::Folder((nb, _))) => OsString::cmp(na, nb),
             }
         }
-        fn render_def_entry(entry: &DefEntry, ui: &mut Ui) -> Option<PuzzleLoadingData> {
+        fn render_def_entry(entry: &DefEntry, ui: &mut Ui) -> Option<PuzzleLoadingDataWithMode> {
             match entry {
                 DefEntry::Def(data) => {
-                    if ui.add(egui::Button::new(data.name.clone())).clicked() {
-                        Some(data.clone())
+                    let button = ui.add(egui::Button::new(data.name.clone()));
+                    if button.clicked() {
+                        Some(PuzzleLoadingDataWithMode {
+                            data: data.clone(),
+                            is_super: false,
+                        })
+                    } else if button.secondary_clicked() {
+                        println!("super");
+                        Some(PuzzleLoadingDataWithMode {
+                            data: data.clone(),
+                            is_super: true,
+                        })
                     } else {
                         None
                     }

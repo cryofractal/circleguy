@@ -5,4 +5,5 @@ pub mod piece_shape;
 pub mod puzzle;
 pub mod render_piece;
 pub mod solve_detection;
+pub mod super_data;
 pub mod turn;

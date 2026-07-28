@@ -6,6 +6,7 @@ use crate::{hps::data_storer::data_storer::DataStorer, puzzle::puzzle::Puzzle};
 
 pub struct PuzzleIOData {
     pub name: String,
+    pub is_super: bool,
     pub path: PathBuf,
     pub scramble: Option<Vec<String>>,
     pub stack: Vec<(String, isize)>,
@@ -15,6 +16,7 @@ impl Puzzle {
     pub fn to_io_data(&self) -> PuzzleIOData {
         PuzzleIOData {
             name: self.solved_data.name.clone(),
+            is_super: self.is_super(),
             path: self.solved_data.path.clone(),
             scramble: self.scramble.clone(),
             stack: self.stack.clone(),
@@ -31,6 +33,7 @@ impl Puzzle {
                     ds.keybinds.get_keybinds_for_puzzle(&data.path.file_name()?),
                 )
                 .ok()?,
+            data.is_super,
         );
         if let Some(scramb) = &data.scramble {
             for s in scramb {
@@ -50,10 +53,20 @@ impl Puzzle {
 
 impl PuzzleIOData {
     pub fn to_string(&self) -> String {
+        let Self {
+            name,
+            is_super,
+            path,
+            scramble,
+            stack,
+        } = self;
         let mut string = String::new();
-        string += &format!("name \"{}\"\n", self.name);
-        string += &format!("path \"{}\"\n", self.path.to_string_lossy());
-        if let Some(s) = &self.scramble {
+        string += &format!("name \"{}\"\n", name);
+        if *is_super {
+            string += "is_super\n";
+        }
+        string += &format!("path \"{}\"\n", path.to_string_lossy());
+        if let Some(s) = &scramble {
             string += "scramble {\n";
             for t in s {
                 string += &format!("\tturn \"{}\"\n", t);
@@ -61,7 +74,7 @@ impl PuzzleIOData {
             string += "}\n";
         }
         string += "solve {\n";
-        for (t, m) in &self.stack {
+        for (t, m) in stack {
             string += &format!("\tturn \"{}\" {}\n", t, m)
         }
         string += "}";
@@ -78,6 +91,7 @@ impl PuzzleIOData {
                     .as_string()?
                     .to_string(),
             ),
+            is_super: kdl.get("is_super").is_some(),
             name: kdl
                 .get("name")?
                 .entries()

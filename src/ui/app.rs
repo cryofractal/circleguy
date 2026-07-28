@@ -66,7 +66,7 @@ impl App {
         Self {
             //return the default app
             data_storer,
-            puzzle: p.map(Puzzle::new),
+            puzzle: p.map(|p| Puzzle::new(p, false)),
             log_path: String::from("logfile"),
             curr_msg: String::new(),
             animation_speed: ANIMATION_SPEED,
@@ -114,6 +114,7 @@ impl eframe::App for App {
                             self.outline_width,
                             self.scale_factor,
                             self.offset,
+                            p.super_data.as_ref(),
                         ) {
                             self.curr_msg = x;
                         }
@@ -129,13 +130,15 @@ impl eframe::App for App {
                     }
                     Ok(Some(puzzle_data)) => {
                         //if a puzzle is returned (a button is clicked), load it
-                        match puzzle_data.load(
+                        match puzzle_data.data.load(
                             &mut ds.rt,
                             ds.keybinds.get_keybinds_for_puzzle(&OsString::from(
-                                puzzle_data.path.file_name().unwrap(),
+                                puzzle_data.data.path.file_name().unwrap(),
                             )),
                         ) {
-                            Ok(puz_data) => self.puzzle = Some(Puzzle::new(puz_data)),
+                            Ok(puz_data) => {
+                                self.puzzle = Some(Puzzle::new(puz_data, puzzle_data.is_super))
+                            }
                             Err(diag) => self.curr_msg = diag.msg.to_string(),
                         }
                         // if let Some(kb) = puzzle_data.keybinds
