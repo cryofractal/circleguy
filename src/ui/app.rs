@@ -133,7 +133,11 @@ impl eframe::App for App {
                         ui,
                         cc,
                         self.outline_width,
-                        OutlineStyle::Hovered,
+                        if self.preview {
+                            OutlineStyle::HoveredSecondary
+                        } else {
+                            OutlineStyle::Hovered
+                        },
                         self.preview,
                     ) {
                         self.curr_msg = x;
@@ -145,7 +149,11 @@ impl eframe::App for App {
                             ui,
                             cc,
                             self.outline_width,
-                            OutlineStyle::HoveredSecondary,
+                            if self.preview {
+                                OutlineStyle::Hovered
+                            } else {
+                                OutlineStyle::HoveredSecondary
+                            },
                             !self.preview,
                         ) {
                             self.curr_msg = x;
@@ -539,7 +547,8 @@ impl App {
                         if !puzzle.in_animation() {
                             // Block hovering if animation is active
                             // Shift held, highlight a piece
-                            self.hovered_piece = puzzle.piece_at_point(mouse.position, false);
+                            self.hovered_piece =
+                                puzzle.piece_at_point(mouse.position, self.preview);
                         }
                     } else {
                         if let Some((_, turn)) = puzzle.turn_at_point(mouse.position) {
@@ -557,7 +566,7 @@ impl App {
                 }
             },
             MouseFunction::Super(mf) => {
-                let hovered_piece = puzzle.piece_at_point(mouse.position, false);
+                let hovered_piece = puzzle.piece_at_point(mouse.position, self.preview);
                 let super_data = puzzle.super_data.as_mut()?;
 
                 match mf {
@@ -569,7 +578,8 @@ impl App {
                         }
                         MouseInteractionType::SecondaryClick => {}
                         MouseInteractionType::Hover => {
-                            self.hovered_piece = puzzle.piece_at_point(mouse.position, false);
+                            self.hovered_piece =
+                                puzzle.piece_at_point(mouse.position, self.preview);
                         }
                         MouseInteractionType::DragOver => {
                             if let Some(hovered_piece) = hovered_piece {
@@ -604,7 +614,8 @@ impl App {
                             }
                         }
                         MouseInteractionType::Hover => {
-                            self.hovered_piece = puzzle.piece_at_point(mouse.position, false);
+                            self.hovered_piece =
+                                puzzle.piece_at_point(mouse.position, self.preview);
                         }
                         MouseInteractionType::DragOver => {
                             if let Some(hovered_piece) = hovered_piece {
