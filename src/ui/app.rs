@@ -126,7 +126,6 @@ impl eframe::App for App {
                         hovered_piece,
                         ui,
                         cc,
-                        None,
                         self.outline_width,
                         OutlineStyle::Hovered,
                         self.preview,

@@ -184,7 +184,6 @@ impl Puzzle {
         index: usize,
         ui: &mut Ui,
         cc: CoordinateConverter,
-        offset: Option<Turn>,
         outline_size: f32,
         outline_style: OutlineStyle,
         solved: bool,
@@ -197,13 +196,12 @@ impl Puzzle {
             Isometry::identity()
         } else {
             piece.isometry
-                * if let Some(offset) = offset
+                * if let Some(offset) = self.position.animation_offset
                     && piece.in_circle(offset.circle)
                         == Some(crate::complex::complex_circle::Contains::Inside)
                 {
                     //get the offset of the piece, base on if its in the animation_offset circle
-
-                    offset.isometry()
+                    offset.mult(self.position.anim_left as f64).isometry()
                 } else {
                     Isometry::identity()
                 }
@@ -249,22 +247,9 @@ impl Puzzle {
         outline_width: f32,
         solved: bool,
     ) -> Result<(), String> {
-        //get the offset from the animation_offset and anim_left
-        let proper_offset = self
-            .position
-            .animation_offset
-            .map(|off| off.mult(self.position.anim_left as f64));
         for i in 0..self.position.pieces.len() {
             //render each piece
-            self.render_piece(
-                i,
-                ui,
-                cc,
-                proper_offset,
-                outline_width,
-                OutlineStyle::Filled,
-                solved,
-            )?;
+            self.render_piece(i, ui, cc, outline_width, OutlineStyle::Filled, solved)?;
         }
         Ok(())
     }
