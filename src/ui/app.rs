@@ -18,7 +18,8 @@ const CREDITS: &str = "Created by Henry Pickle,
 with major help from:
 Luna Harran (sonicpineapple)
 Andrew Farkas (HactarCE)
-cryofractal";
+cryofractal
+Milo Jacquet";
 
 #[derive(Debug)]
 ///used for running the app. contains all puzzle and view data at runtime
