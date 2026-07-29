@@ -351,31 +351,33 @@ impl eframe::App for App {
                             ui.checkbox(&mut self.preview, "Preview solved state");
 
                             ui.separator();
-                            if matches!(
-                                self.mouse_function,
-                                MouseFunction::Super(SuperMouseFunction::OrientationColor)
-                            ) {
-                                if ui.button(String::from("Move mode")).clicked() {
-                                    self.mouse_function = MouseFunction::Normal;
-                                };
-                                if super_data.orientation_colored.is_all() {
-                                    if ui.button(String::from("Deselect all")).clicked() {
-                                        super_data.orientation_colored = SetOrAll::empty();
+
+                            ui.label("Orientation color");
+                            ui.indent("Orientation color", |ui| {
+                                ui.horizontal(|ui| {
+                                    ui.label(match &super_data.orientation_colored {
+                                        SetOrAll::Set(set) => format!("{} selected", set.len()),
+                                        SetOrAll::All => "All selected".to_string(),
+                                    });
+                                    let selected = matches!(
+                                        self.mouse_function,
+                                        MouseFunction::Super(SuperMouseFunction::OrientationColor,)
+                                    );
+                                    if ui.add(Button::new("Select").selected(selected)).clicked() {
+                                        if selected {
+                                            self.mouse_function = MouseFunction::Normal;
+                                        } else {
+                                            self.mouse_function = MouseFunction::Super(
+                                                SuperMouseFunction::OrientationColor,
+                                            );
+                                        }
                                     };
-                                } else {
-                                    if ui.button(String::from("Select all")).clicked() {
-                                        super_data.orientation_colored = SetOrAll::All;
+                                    if ui.button("Toggle all").clicked() {
+                                        self.mouse_function = MouseFunction::Normal;
+                                        super_data.orientation_colored.toggle_all();
                                     };
-                                }
-                            } else {
-                                if ui
-                                    .button(String::from("Orientation color toggle mode"))
-                                    .clicked()
-                                {
-                                    self.mouse_function =
-                                        MouseFunction::Super(SuperMouseFunction::OrientationColor);
-                                };
-                            }
+                                })
+                            });
                         });
                 }
             }

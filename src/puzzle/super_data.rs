@@ -59,6 +59,13 @@ impl SetOrAll {
             SetOrAll::All => true,
         }
     }
+
+    pub fn toggle_all(&mut self) {
+        match self {
+            SetOrAll::Set(_) => *self = Self::All,
+            SetOrAll::All => *self = Self::empty(),
+        }
+    }
 }
 
 /// Data on color scheme for super puzzles
