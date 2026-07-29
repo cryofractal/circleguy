@@ -110,6 +110,23 @@ impl PieceShape {
             },
         ))
     }
+
+    pub fn intersect_by_circle(&self, circle: OrientedCircle) -> Option<PieceShape> {
+        match self.cut_by_circle(circle.circ) {
+            Some((inside, outside)) => Some(match circle.ori {
+                Contains::Inside | Contains::Border => inside,
+                Contains::Outside => outside,
+            }),
+            None => {
+                if self.in_circle(circle.circ)? == circle.ori {
+                    Some(self.clone())
+                } else {
+                    None
+                }
+            }
+        }
+    }
+
     ///detect if a shape is in a circle. Some(x) means that the shape is entirely x, None means that the shape crosses the border of the circle
     pub fn in_circle(&self, circle: Circle) -> Option<Contains> {
         let mut inside = None; //tracks whether the piece is inside the circle

@@ -106,6 +106,7 @@ pub enum MouseFunction {
 #[derive(Debug, Copy, Clone)]
 pub enum SuperMouseFunction {
     OrientationColor,
+    Starburst,
 }
 
 impl eframe::App for App {
@@ -378,6 +379,32 @@ impl eframe::App for App {
                                     };
                                 })
                             });
+
+                            ui.label("Starburst");
+                            ui.indent("Starburst", |ui| {
+                                ui.horizontal(|ui| {
+                                    ui.label(match &super_data.starburst {
+                                        SetOrAll::Set(set) => format!("{} selected", set.len()),
+                                        SetOrAll::All => "All selected".to_string(),
+                                    });
+                                    let selected = matches!(
+                                        self.mouse_function,
+                                        MouseFunction::Super(SuperMouseFunction::Starburst)
+                                    );
+                                    if ui.add(Button::new("Select").selected(selected)).clicked() {
+                                        if selected {
+                                            self.mouse_function = MouseFunction::Normal;
+                                        } else {
+                                            self.mouse_function =
+                                                MouseFunction::Super(SuperMouseFunction::Starburst);
+                                        }
+                                    };
+                                    if ui.button("Toggle all").clicked() {
+                                        self.mouse_function = MouseFunction::Normal;
+                                        super_data.starburst.toggle_all();
+                                    };
+                                })
+                            });
                         });
                 }
             }
@@ -556,6 +583,38 @@ impl App {
                                         self.inserting_on_drag = Some(
                                             super_data.orientation_colored.toggle(hovered_piece),
                                         )
+                                    }
+                                }
+                            }
+                        }
+                        MouseInteractionType::Scroll(_) => {}
+                    },
+                    SuperMouseFunction::Starburst => match mouse.typ {
+                        MouseInteractionType::Click => {
+                            if let Some(hovered_piece) = hovered_piece {
+                                if super_data.starburst.set().is_some_and(|set| set.is_empty()) {
+                                    super_data.starburst_center = hovered_piece;
+                                }
+                                super_data.starburst.toggle(hovered_piece);
+                            }
+                        }
+                        MouseInteractionType::SecondaryClick => {
+                            if let Some(hovered_piece) = hovered_piece {
+                                super_data.starburst_center = hovered_piece;
+                            }
+                        }
+                        MouseInteractionType::Hover => {
+                            self.hovered_piece = puzzle.piece_at_point(mouse.position, false);
+                        }
+                        MouseInteractionType::DragOver => {
+                            if let Some(hovered_piece) = hovered_piece {
+                                match self.inserting_on_drag {
+                                    Some(insert) => {
+                                        super_data.starburst.toggle_to(hovered_piece, insert);
+                                    }
+                                    None => {
+                                        self.inserting_on_drag =
+                                            Some(super_data.starburst.toggle(hovered_piece))
                                     }
                                 }
                             }

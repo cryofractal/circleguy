@@ -53,6 +53,13 @@ impl SetOrAll {
         }
     }
 
+    pub fn set(&self) -> Option<&HashSet<usize>> {
+        match self {
+            SetOrAll::Set(set) => Some(set),
+            SetOrAll::All => None,
+        }
+    }
+
     pub fn is_all(&self) -> bool {
         match self {
             SetOrAll::Set(_) => false,
@@ -72,12 +79,18 @@ impl SetOrAll {
 #[derive(Debug, Clone)]
 pub struct SuperData {
     pub orientation_colored: SetOrAll,
+    pub starburst_center: usize,
+    pub starburst: SetOrAll,
 }
 
 impl SuperData {
+    // TODO: make it so that only SetOrAll can have a given index
+
     pub fn new() -> Self {
         Self {
             orientation_colored: SetOrAll::empty(),
+            starburst_center: 0,
+            starburst: SetOrAll::empty(),
         }
     }
 
@@ -85,7 +98,10 @@ impl SuperData {
     pub fn split_index(&mut self, index: usize, new_index: usize) {
         let SuperData {
             orientation_colored,
+            starburst_center: _,
+            starburst,
         } = self;
         orientation_colored.split_index(index, new_index);
+        starburst.split_index(index, new_index);
     }
 }

@@ -197,4 +197,15 @@ impl RenderPiece {
     pub fn contains(&self, point: Point) -> Contains {
         self.piece.shape.contains(point * self.isometry.inverse())
     }
+
+    /// Estimate the barycenter by averaging the midpoints of all the arcs. It may not be in the piece!
+    pub fn barycenter(&self) -> Point {
+        let mut center = Point(C64 { re: 0.0, im: 0.0 });
+        let n = self.piece.shape.border.len() as f64;
+        for arc in &self.piece.shape.border {
+            center.0.re += arc.midpoint().0.re / n;
+            center.0.im += arc.midpoint().0.im / n;
+        }
+        center
+    }
 }

@@ -1,13 +1,17 @@
 use crate::DEF_PATH;
+use crate::DETAIL;
 use crate::PRECISION;
 use crate::complex::c64::C64;
 use crate::complex::complex_circle::Circle;
+use crate::complex::complex_circle::Contains;
+use crate::complex::complex_circle::OrientedCircle;
 use crate::complex::isometry::Isometry;
 use crate::complex::point::Point;
 use crate::hps::data_storer::data_storer::DataStorer;
 use crate::hps::data_storer::data_storer::PuzzleLoadingData;
 use crate::hps::data_storer::def_entry::DefEntry;
 use crate::puzzle::color::Color;
+use crate::puzzle::piece::Piece;
 use crate::puzzle::puzzle::*;
 use crate::puzzle::render_piece::Triangulation;
 use approx_collections::ApproxEq;
@@ -23,6 +27,9 @@ use egui::{
 use std::cmp::*;
 use std::f64::consts::PI;
 use std::ffi::OsString;
+
+const STARBURST_SIZE: usize = 20;
+const STARBURST_CUT_RADIUS: f64 = 1000.0;
 
 pub struct RenderingCircle {
     pub cent: Pos2,
@@ -178,6 +185,15 @@ impl OutlineStyle {
     }
 }
 
+fn starburst_circle(i: usize, n: usize, center: Point) -> Circle {
+    Circle {
+        center: Point(
+            STARBURST_CUT_RADIUS * C64::from_angle(2.0 * PI * i as f64 / n as f64) + center.0,
+        ),
+        r_sq: STARBURST_CUT_RADIUS.powi(2),
+    }
+}
+
 ///render a piece, with an outline
 impl Puzzle {
     pub fn render_piece(
@@ -208,30 +224,77 @@ impl Puzzle {
                 }
         };
 
-        let color = match &self.super_data {
+        let pieces = match &self.super_data {
             Some(super_data) => {
                 if super_data.orientation_colored.contains(index) {
                     let angle = isometry.rotation_angle();
                     // angle is in [-π, π]
-                    if angle.approx_eq(&0.0, PRECISION) {
+                    let color = if angle.approx_eq(&0.0, PRECISION) {
                         Color::White.to_egui()
                     } else {
                         let colorous::Color { r, g, b } =
                             colorous::RAINBOW.eval_continuous((angle / (2.0 * PI) + 2.0).fract()); // make sure it's in the range 0.0..1.0
                         Color32::from_rgb(r, g, b)
+                    };
+                    vec![(piece.clone(), color)]
+                } else if super_data.starburst.contains(index) {
+                    let starburst_center = self
+                        .position
+                        .pieces
+                        .get(super_data.starburst_center)
+                        .ok_or("Starburst center does not exist")?
+                        .barycenter();
+                    let mut pieces = Vec::new();
+                    for i in 0..STARBURST_SIZE {
+                        // TODO: hack because no straight lines: cut by huge circles
+                        let shape = &piece.piece.shape;
+                        let Some(shape) = shape.intersect_by_circle(OrientedCircle {
+                            circ: starburst_circle(i, STARBURST_SIZE, starburst_center),
+                            ori: Contains::Inside,
+                        }) else {
+                            continue;
+                        };
+                        let Some(shape) = shape.intersect_by_circle(OrientedCircle {
+                            circ: starburst_circle(i - 1, STARBURST_SIZE, starburst_center),
+                            ori: Contains::Outside,
+                        }) else {
+                            continue;
+                        };
+
+                        let colorous::Color { r, g, b } =
+                            colorous::RAINBOW.eval_rational(i, STARBURST_SIZE); // make sure it's in the range 0.0..1.0
+                        let color = Color32::from_rgb(r, g, b);
+
+                        pieces.push((
+                            Piece {
+                                shape,
+                                color: Color::Black,
+                            }
+                            .triangulate(DETAIL),
+                            color,
+                        )) // TODO: dummy color
                     }
+                    pieces
                 } else {
-                    Color32::DARK_GRAY
+                    vec![(piece.clone(), Color32::DARK_GRAY)]
                 }
             }
-            None => piece.piece.color.to_egui(),
+            None => {
+                let color = piece.piece.color.to_egui();
+                vec![(piece.clone(), color)]
+            }
         };
 
-        for triangle in &piece.triangulations {
-            //iterate over the triangles
-            if matches!(outline_style, OutlineStyle::Filled) {
-                triangle.render_fill(ui, cc, isometry, color);
+        for (new_piece, color) in pieces {
+            for triangle in &new_piece.triangulations {
+                //iterate over the triangles
+                if matches!(outline_style, OutlineStyle::Filled) {
+                    triangle.render_fill(ui, cc, isometry, color);
+                }
             }
+        }
+
+        for triangle in &piece.triangulations {
             triangle.render_outlines(
                 ui,
                 cc,
@@ -240,6 +303,7 @@ impl Puzzle {
                 outline_style.color(),
             );
         }
+
         Ok(())
     }
 }
