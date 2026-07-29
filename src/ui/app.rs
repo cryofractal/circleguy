@@ -1,9 +1,11 @@
+use std::collections::HashSet;
 use std::ffi::OsString;
 use std::path::PathBuf;
 
 use crate::complex::point::Point;
 use crate::hps::data_storer::data_storer::DataStorer;
 use crate::puzzle::puzzle::*;
+use crate::puzzle::super_data::SetOrAll;
 use crate::ui::render::{CoordinateConverter, OutlineStyle, draw_circle};
 use crate::{DEF_PATH, DEFAULT_PUZZLE, hps};
 use egui::*;
@@ -350,6 +352,15 @@ impl eframe::App for App {
                                 if ui.button(String::from("Move mode")).clicked() {
                                     self.mouse_function = MouseFunction::Normal;
                                 };
+                                if super_data.orientation_colored.is_all() {
+                                    if ui.button(String::from("Deselect all")).clicked() {
+                                        super_data.orientation_colored = SetOrAll::empty();
+                                    };
+                                } else {
+                                    if ui.button(String::from("Select all")).clicked() {
+                                        super_data.orientation_colored = SetOrAll::All;
+                                    };
+                                }
                             } else {
                                 if ui
                                     .button(String::from("Orientation color toggle mode"))
@@ -516,7 +527,7 @@ impl App {
                     SuperMouseFunction::OrientationColor => match mouse.typ {
                         MouseInteractionType::Click => {
                             if let Some(hovered_piece) = hovered_piece {
-                                super_data.toggle_orientation_colored(hovered_piece);
+                                super_data.orientation_colored.toggle(hovered_piece);
                             }
                         }
                         MouseInteractionType::SecondaryClick => {}

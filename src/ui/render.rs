@@ -210,7 +210,7 @@ impl Puzzle {
 
         let color = match &self.super_data {
             Some(super_data) => {
-                if super_data.orientation_colored.contains(&index) {
+                if super_data.orientation_colored.contains(index) {
                     let angle = isometry.rotation_angle();
                     // angle is in [-π, π]
                     if angle.approx_eq(&0.0, PRECISION) {
