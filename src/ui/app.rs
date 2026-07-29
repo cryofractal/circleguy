@@ -116,14 +116,14 @@ impl eframe::App for App {
             };
 
             // Render the puzzle on the bottom layer
-            if let Some(ref mut p) = self.puzzle {
-                if let Err(x) = p.render(ui, cc, self.outline_width, self.preview) {
+            if let Some(puzzle) = self.puzzle.as_mut() {
+                if let Err(x) = puzzle.render(ui, cc, self.outline_width, self.preview) {
                     self.curr_msg = x;
                 };
 
                 // Render the hovered outline on top of the normal outline
                 if let Some(hovered_piece) = self.hovered_piece {
-                    if let Err(x) = p.render_piece(
+                    if let Err(x) = puzzle.render_piece(
                         hovered_piece,
                         ui,
                         cc,
@@ -132,6 +132,19 @@ impl eframe::App for App {
                         self.preview,
                     ) {
                         self.curr_msg = x;
+                    }
+
+                    if puzzle.super_data.is_some() {
+                        if let Err(x) = puzzle.render_piece(
+                            hovered_piece,
+                            ui,
+                            cc,
+                            self.outline_width,
+                            OutlineStyle::HoveredSecondary,
+                            !self.preview,
+                        ) {
+                            self.curr_msg = x;
+                        }
                     }
                 }
             }
@@ -455,6 +468,8 @@ impl App {
                 }
             }
         }
+
+        self.hovered_piece = None; // it will be set below if necessary
 
         // Mode-dependent interactions
 

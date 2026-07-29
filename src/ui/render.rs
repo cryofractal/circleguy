@@ -154,6 +154,7 @@ pub enum OutlineStyle {
     Filled,
     Normal,
     Hovered,
+    HoveredSecondary,
 }
 
 impl OutlineStyle {
@@ -162,6 +163,7 @@ impl OutlineStyle {
             OutlineStyle::Filled => 1.0,
             OutlineStyle::Normal => 1.0,
             OutlineStyle::Hovered => 2.0,
+            OutlineStyle::HoveredSecondary => 1.5,
         }
     }
 
@@ -170,6 +172,7 @@ impl OutlineStyle {
             OutlineStyle::Filled => Color32::BLACK,
             OutlineStyle::Normal => Color32::BLACK,
             OutlineStyle::Hovered => Color32::from_rgb(210, 210, 210),
+            OutlineStyle::HoveredSecondary => Color32::from_rgb(168, 168, 168),
         }
     }
 }
