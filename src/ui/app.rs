@@ -1,4 +1,3 @@
-use std::collections::HashSet;
 use std::ffi::OsString;
 use std::path::PathBuf;
 
@@ -7,7 +6,7 @@ use crate::hps::data_storer::data_storer::DataStorer;
 use crate::puzzle::puzzle::*;
 use crate::puzzle::super_data::SetOrAll;
 use crate::ui::render::{CoordinateConverter, OutlineStyle, draw_circle};
-use crate::{DEF_PATH, DEFAULT_PUZZLE, hps};
+use crate::{DEF_PATH, DEFAULT_PUZZLE};
 use egui::*;
 
 ///default scale factor
@@ -37,6 +36,7 @@ pub struct App {
     preview: bool,                   //whether the solved state is being previewed
     mouse_function: MouseFunction,   // Current hover function
     hovered_piece: Option<usize>,    // Index of the hovered piece from the previous frame
+    inserting_on_drag: Option<bool>, // Whether the drag is inserting or removing from the set in SuperData.
 }
 impl App {
     ///initialize a new app, using some default settings (from the constants)
@@ -83,6 +83,7 @@ impl App {
             preview: false,
             mouse_function: MouseFunction::Normal,
             hovered_piece: None,
+            inserting_on_drag: None,
             // keybinds: if let Some(kb) = &p_data.keybinds
             //     && let Some(gr) = &p_data.keybind_groups
             //     && let Some(keybinds) = load_keybinds(&kb, &gr)
@@ -512,6 +513,7 @@ impl App {
                         }
                     }
                 }
+                MouseInteractionType::DragOver => {}
                 MouseInteractionType::Scroll(scroll) => {
                     if let Some((turn_id, _)) = puzzle.turn_at_point(mouse.position) {
                         let turn_result =
@@ -523,6 +525,7 @@ impl App {
             MouseFunction::Super(mf) => {
                 let hovered_piece = puzzle.piece_at_point(mouse.position, false);
                 let super_data = puzzle.super_data.as_mut()?;
+
                 match mf {
                     SuperMouseFunction::OrientationColor => match mouse.typ {
                         MouseInteractionType::Click => {
@@ -534,10 +537,31 @@ impl App {
                         MouseInteractionType::Hover => {
                             self.hovered_piece = puzzle.piece_at_point(mouse.position, false);
                         }
+                        MouseInteractionType::DragOver => {
+                            if let Some(hovered_piece) = hovered_piece {
+                                match self.inserting_on_drag {
+                                    Some(insert) => {
+                                        super_data
+                                            .orientation_colored
+                                            .toggle_to(hovered_piece, insert);
+                                    }
+                                    None => {
+                                        self.inserting_on_drag = Some(
+                                            super_data.orientation_colored.toggle(hovered_piece),
+                                        )
+                                    }
+                                }
+                            }
+                        }
                         MouseInteractionType::Scroll(_) => {}
                     },
                 }
             }
+        }
+
+        if !matches!(mouse.typ, MouseInteractionType::DragOver) {
+            // Done dragging
+            self.inserting_on_drag = None;
         }
 
         Some(())
@@ -564,6 +588,7 @@ enum MouseInteractionType {
     Click,
     SecondaryClick,
     Hover,
+    DragOver,
     Scroll(i32),
 }
 
@@ -575,6 +600,7 @@ fn mouse_interaction(
 ) -> Option<MouseInteraction> {
     let shift = ctx.input(|i| i.modifiers.shift);
     let ctrl = ctx.input(|i| i.modifiers.shift);
+    let dragging = ctx.input(|i| i.pointer.is_decidedly_dragging());
 
     let scroll = ui.input(|input| {
         input
@@ -598,7 +624,10 @@ fn mouse_interaction(
         raw_position = r.hover_pos();
         typ = MouseInteractionType::Scroll(scroll);
     } else {
-        if r.clicked() {
+        if dragging {
+            raw_position = r.hover_pos();
+            typ = MouseInteractionType::DragOver;
+        } else if r.clicked() {
             raw_position = r.interact_pointer_pos();
             typ = MouseInteractionType::Click;
         } else if r.secondary_clicked() {

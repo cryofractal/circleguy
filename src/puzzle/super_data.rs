@@ -32,12 +32,19 @@ impl SetOrAll {
         };
     }
 
-    pub fn toggle(&mut self, index: usize) {
-        if self.contains(index) {
-            self.remove(index);
-        } else {
+    pub fn toggle_to(&mut self, index: usize, insert: bool) {
+        if insert {
             self.insert(index);
+        } else {
+            self.remove(index);
         }
+    }
+
+    /// Toggle present of this index. Returns whether or not the index is now in the set.
+    pub fn toggle(&mut self, index: usize) -> bool {
+        let to_contain = !self.contains(index);
+        self.toggle_to(index, to_contain);
+        to_contain
     }
 
     fn split_index(&mut self, index: usize, new_index: usize) {
