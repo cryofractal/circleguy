@@ -33,6 +33,7 @@ pub struct App {
     cut_on_turn: bool,               //whether or not turns should cut the puzzle
     preview: bool,                   //whether the solved state is being previewed
     mouse_function: MouseFunction,   // Current hover function
+    hovered_piece: Option<usize>,    // Index of the hovered piece from the previous frame
 }
 impl App {
     ///initialize a new app, using some default settings (from the constants)
@@ -78,6 +79,7 @@ impl App {
             cut_on_turn: false,
             preview: false,
             mouse_function: MouseFunction::Normal,
+            hovered_piece: None,
             // keybinds: if let Some(kb) = &p_data.keybinds
             //     && let Some(gr) = &p_data.keybind_groups
             //     && let Some(keybinds) = load_keybinds(&kb, &gr)
@@ -111,10 +113,40 @@ impl eframe::App for App {
                 scale_factor: self.scale_factor,
                 offset_pos: self.offset,
             };
+
+            // Render the puzzle on the bottom layer
             if let Some(ref mut p) = self.puzzle {
                 if let Err(x) = p.render(ui, cc, self.outline_width, self.preview) {
                     self.curr_msg = x;
                 };
+
+                // Render the hovered outline on top of the normal outline
+                if let Some(hovered_piece) = self.hovered_piece {
+                    if let Err(x) = p.render_piece(
+                        hovered_piece,
+                        ui,
+                        cc,
+                        None,
+                        self.outline_width,
+                        OutlineStyle::Hovered,
+                        self.preview,
+                    ) {
+                        self.curr_msg = x;
+                    }
+
+                    match self.mouse_function {
+                        MouseFunction::Normal => {}
+                        MouseFunction::Super(mf) => {
+                            if let Some(super_data) = p.super_data.as_mut() {
+                                match mf {
+                                    SuperMouseFunction::OrientationColor => {
+                                        super_data.toggle_orientation_colored(hovered_piece);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
 
             //render the data storer panel -- this stores all of the puzzles that you can load
@@ -436,36 +468,7 @@ impl eframe::App for App {
                     if !p.in_animation() {
                         // Block hovering if animation is active
                         // Shift held, highlight a piece
-                        let hovered_piece = p.get_hovered_piece(cc, pointer);
-
-                        // Render the hovered outline on top of the normal outline
-                        if let Some(hovered_piece) = hovered_piece {
-                            if let Err(x) = p.render_piece(
-                                hovered_piece,
-                                ui,
-                                cc,
-                                None,
-                                self.outline_width,
-                                OutlineStyle::Hovered,
-                                self.preview,
-                            ) {
-                                self.curr_msg = x;
-                            }
-
-                            match self.mouse_function {
-                                MouseFunction::Normal => {}
-                                MouseFunction::Super(mf) => {
-                                    if let Some(super_data) = p.super_data.as_mut() {
-                                        match mf {
-                                            SuperMouseFunction::OrientationColor => {
-                                                super_data
-                                                    .toggle_orientation_colored(hovered_piece);
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
+                        self.hovered_piece = p.get_hovered_piece(cc, pointer);
                     }
                 } else {
                     // No modifiers, render the circle
