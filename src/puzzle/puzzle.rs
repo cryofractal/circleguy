@@ -1,6 +1,5 @@
 use crate::DETAIL;
 use crate::PRECISION;
-use crate::complex::c64::C64;
 use crate::complex::complex_circle::Contains;
 use crate::complex::point::Point;
 use crate::hps::data_storer::data_storer::PuzzleData;

@@ -14,6 +14,7 @@ use crate::puzzle::color::Color;
 use crate::puzzle::piece::Piece;
 use crate::puzzle::puzzle::*;
 use crate::puzzle::render_piece::Triangulation;
+use crate::puzzle::super_data::SuperStyle;
 use approx_collections::ApproxEq;
 use core::f64;
 use egui::FontId;
@@ -226,57 +227,61 @@ impl Puzzle {
 
         let pieces = match &self.super_data {
             Some(super_data) => {
-                if super_data.orientation_colored.contains(index) {
-                    let angle = isometry.rotation_angle();
-                    // angle is in [-π, π]
-                    let color = if angle.approx_eq(&0.0, PRECISION) {
-                        Color::White.to_egui()
-                    } else {
-                        let colorous::Color { r, g, b } =
-                            colorous::RAINBOW.eval_continuous((angle / (2.0 * PI) + 2.0).fract()); // make sure it's in the range 0.0..1.0
-                        Color32::from_rgb(r, g, b)
-                    };
-                    vec![(piece.clone(), color)]
-                } else if super_data.starburst.contains(index) {
-                    let starburst_center = self
-                        .position
-                        .pieces
-                        .get(super_data.starburst_center)
-                        .ok_or("Starburst center does not exist")?
-                        .barycenter();
-                    let mut pieces = Vec::new();
-                    for i in 0..STARBURST_SIZE {
-                        // TODO: hack because no straight lines: cut by huge circles
-                        let shape = &piece.piece.shape;
-                        let Some(shape) = shape.intersect_by_circle(OrientedCircle {
-                            circ: starburst_circle(i, STARBURST_SIZE, starburst_center),
-                            ori: Contains::Inside,
-                        }) else {
-                            continue;
-                        };
-                        let Some(shape) = shape.intersect_by_circle(OrientedCircle {
-                            circ: starburst_circle(i - 1, STARBURST_SIZE, starburst_center),
-                            ori: Contains::Outside,
-                        }) else {
-                            continue;
-                        };
-
-                        let colorous::Color { r, g, b } =
-                            colorous::RAINBOW.eval_rational(i, STARBURST_SIZE); // make sure it's in the range 0.0..1.0
-                        let color = Color32::from_rgb(r, g, b);
-
-                        pieces.push((
-                            Piece {
-                                shape,
-                                color: Color::Black,
-                            }
-                            .triangulate(DETAIL),
-                            color,
-                        )) // TODO: dummy color
+                match super_data.get(index) {
+                    None => {
+                        vec![(piece.clone(), Color32::DARK_GRAY)]
                     }
-                    pieces
-                } else {
-                    vec![(piece.clone(), Color32::DARK_GRAY)]
+                    Some(SuperStyle::OrientationColor) => {
+                        let angle = isometry.rotation_angle();
+                        // angle is in [-π, π]
+                        let color = if angle.approx_eq(&0.0, PRECISION) {
+                            Color::White.to_egui()
+                        } else {
+                            let colorous::Color { r, g, b } = colorous::RAINBOW
+                                .eval_continuous((angle / (2.0 * PI) + 2.0).fract()); // make sure it's in the range 0.0..1.0
+                            Color32::from_rgb(r, g, b)
+                        };
+                        vec![(piece.clone(), color)]
+                    }
+                    Some(SuperStyle::Starburst) => {
+                        let starburst_center = self
+                            .position
+                            .pieces
+                            .get(super_data.starburst_center)
+                            .ok_or("Starburst center does not exist")?
+                            .barycenter();
+                        let mut pieces = Vec::new();
+                        for i in 0..STARBURST_SIZE {
+                            // TODO: hack because no straight lines: cut by huge circles
+                            let shape = &piece.piece.shape;
+                            let Some(shape) = shape.intersect_by_circle(OrientedCircle {
+                                circ: starburst_circle(i, STARBURST_SIZE, starburst_center),
+                                ori: Contains::Inside,
+                            }) else {
+                                continue;
+                            };
+                            let Some(shape) = shape.intersect_by_circle(OrientedCircle {
+                                circ: starburst_circle(i - 1, STARBURST_SIZE, starburst_center),
+                                ori: Contains::Outside,
+                            }) else {
+                                continue;
+                            };
+
+                            let colorous::Color { r, g, b } =
+                                colorous::RAINBOW.eval_rational(i, STARBURST_SIZE); // make sure it's in the range 0.0..1.0
+                            let color = Color32::from_rgb(r, g, b);
+
+                            pieces.push((
+                                Piece {
+                                    shape,
+                                    color: Color::Black,
+                                }
+                                .triangulate(DETAIL),
+                                color,
+                            )) // TODO: dummy color
+                        }
+                        pieces
+                    }
                 }
             }
             None => {

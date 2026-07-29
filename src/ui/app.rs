@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use crate::complex::point::Point;
 use crate::hps::data_storer::data_storer::DataStorer;
 use crate::puzzle::puzzle::*;
-use crate::puzzle::super_data::SetOrAll;
+use crate::puzzle::super_data::SuperStyle;
 use crate::ui::render::{CoordinateConverter, OutlineStyle, draw_circle};
 use crate::{DEF_PATH, DEFAULT_PUZZLE};
 use egui::*;
@@ -364,13 +364,12 @@ impl eframe::App for App {
                             ui.label("Orientation color");
                             ui.indent("Orientation color", |ui| {
                                 ui.horizontal(|ui| {
-                                    ui.label(match &super_data.orientation_colored {
-                                        SetOrAll::Set(set) => format!("{} selected", set.len()),
-                                        SetOrAll::All => "All selected".to_string(),
-                                    });
+                                    ui.label(
+                                        super_data.selected_string(SuperStyle::OrientationColor),
+                                    );
                                     let selected = matches!(
                                         self.mouse_function,
-                                        MouseFunction::Super(SuperMouseFunction::OrientationColor,)
+                                        MouseFunction::Super(SuperMouseFunction::OrientationColor)
                                     );
                                     if ui.add(Button::new("Select").selected(selected)).clicked() {
                                         if selected {
@@ -381,9 +380,15 @@ impl eframe::App for App {
                                             );
                                         }
                                     };
-                                    if ui.button("Toggle all").clicked() {
+                                    if ui
+                                        .add(Button::new("All").selected(
+                                            super_data.piece_style_all
+                                                == Some(SuperStyle::OrientationColor),
+                                        ))
+                                        .clicked()
+                                    {
                                         self.mouse_function = MouseFunction::Normal;
-                                        super_data.orientation_colored.toggle_all();
+                                        super_data.toggle_all(SuperStyle::OrientationColor);
                                     };
                                 })
                             });
@@ -391,10 +396,7 @@ impl eframe::App for App {
                             ui.label("Starburst");
                             ui.indent("Starburst", |ui| {
                                 ui.horizontal(|ui| {
-                                    ui.label(match &super_data.starburst {
-                                        SetOrAll::Set(set) => format!("{} selected", set.len()),
-                                        SetOrAll::All => "All selected".to_string(),
-                                    });
+                                    ui.label(super_data.selected_string(SuperStyle::Starburst));
                                     let selected = matches!(
                                         self.mouse_function,
                                         MouseFunction::Super(SuperMouseFunction::Starburst)
@@ -407,9 +409,15 @@ impl eframe::App for App {
                                                 MouseFunction::Super(SuperMouseFunction::Starburst);
                                         }
                                     };
-                                    if ui.button("Toggle all").clicked() {
+                                    if ui
+                                        .add(Button::new("All").selected(
+                                            super_data.piece_style_all
+                                                == Some(SuperStyle::Starburst),
+                                        ))
+                                        .clicked()
+                                    {
                                         self.mouse_function = MouseFunction::Normal;
-                                        super_data.starburst.toggle_all();
+                                        super_data.toggle_all(SuperStyle::Starburst);
                                     };
                                 })
                             });
@@ -573,7 +581,7 @@ impl App {
                     SuperMouseFunction::OrientationColor => match mouse.typ {
                         MouseInteractionType::Click => {
                             if let Some(hovered_piece) = hovered_piece {
-                                super_data.orientation_colored.toggle(hovered_piece);
+                                super_data.toggle(hovered_piece, SuperStyle::OrientationColor);
                             }
                         }
                         MouseInteractionType::SecondaryClick => {}
@@ -585,14 +593,18 @@ impl App {
                             if let Some(hovered_piece) = hovered_piece {
                                 match self.inserting_on_drag {
                                     Some(insert) => {
-                                        super_data
-                                            .orientation_colored
-                                            .toggle_to(hovered_piece, insert);
+                                        super_data.toggle_to(
+                                            hovered_piece,
+                                            SuperStyle::OrientationColor,
+                                            insert,
+                                        );
                                     }
                                     None => {
-                                        self.inserting_on_drag = Some(
-                                            super_data.orientation_colored.toggle(hovered_piece),
-                                        )
+                                        self.inserting_on_drag =
+                                            Some(super_data.toggle(
+                                                hovered_piece,
+                                                SuperStyle::OrientationColor,
+                                            ))
                                     }
                                 }
                             }
@@ -602,10 +614,10 @@ impl App {
                     SuperMouseFunction::Starburst => match mouse.typ {
                         MouseInteractionType::Click => {
                             if let Some(hovered_piece) = hovered_piece {
-                                if super_data.starburst.set().is_some_and(|set| set.is_empty()) {
+                                if super_data.styled_count(SuperStyle::Starburst) == 0 {
                                     super_data.starburst_center = hovered_piece;
                                 }
-                                super_data.starburst.toggle(hovered_piece);
+                                super_data.toggle(hovered_piece, SuperStyle::Starburst);
                             }
                         }
                         MouseInteractionType::SecondaryClick => {
@@ -621,11 +633,16 @@ impl App {
                             if let Some(hovered_piece) = hovered_piece {
                                 match self.inserting_on_drag {
                                     Some(insert) => {
-                                        super_data.starburst.toggle_to(hovered_piece, insert);
+                                        super_data.toggle_to(
+                                            hovered_piece,
+                                            SuperStyle::Starburst,
+                                            insert,
+                                        );
                                     }
                                     None => {
-                                        self.inserting_on_drag =
-                                            Some(super_data.starburst.toggle(hovered_piece))
+                                        self.inserting_on_drag = Some(
+                                            super_data.toggle(hovered_piece, SuperStyle::Starburst),
+                                        )
                                     }
                                 }
                             }
