@@ -1,3 +1,4 @@
+use crate::hps::custom_values::hpspuzzledata::HPSPuzzleData;
 use crate::{
     hps::{
         builtins::{circleguy_builtins, circleguy_hps_builtins, loading_builtins},
@@ -6,7 +7,7 @@ use crate::{
             def_entry::DefEntry, io::*, keybind_data::KeybindData, puzzle_io::PuzzleIOData,
         },
     },
-    puzzle::puzzle::{Puzzle, PuzzleData},
+    puzzle::puzzle::Puzzle,
 };
 use hyperpuzzlescript::{
     BUILTIN_SPAN, CustomValue, EvalCtx, FnValue, FullDiagnostic, List, Map, Runtime, Scope, Spanned,
@@ -36,6 +37,13 @@ pub struct PuzzleLoadingData {
     pub constructor: Spanned<Arc<FnValue>>,
 }
 
+#[derive(Debug, Clone)]
+pub struct PuzzleData {
+    pub data: HPSPuzzleData,
+    pub keybinds: HashMap<egui::Key, (String, isize)>,
+    pub path: PathBuf,
+}
+
 impl PuzzleLoadingData {
     pub fn load(
         &self,
@@ -63,14 +71,15 @@ impl PuzzleLoadingData {
             .as_ref::<HPSPuzzle>()?
             .0
             .lock()
-            .unwrap()
-            .to_puzzle_data(&self.path);
+            .unwrap();
         puz.authors = self.authors.clone();
         puz.name = self.name.clone();
-        puz.depth = self.scramble;
-        puz.keybinds = keybinds;
-        puz.path = self.path.clone();
-        Ok(puz)
+        puz.scramble = self.scramble;
+        Ok(PuzzleData {
+            data: puz.clone(),
+            keybinds,
+            path: self.path.clone(),
+        })
     }
 }
 

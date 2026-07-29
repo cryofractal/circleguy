@@ -112,26 +112,9 @@ impl eframe::App for App {
                 offset_pos: self.offset,
             };
             if let Some(ref mut p) = self.puzzle {
-                if !self.preview {
-                    //if the puzzle isnt being previewed, render it
-                    if let Err(x) = p.render(ui, cc, self.outline_width) {
-                        self.curr_msg = x;
-                    };
-                    //if the puzzle is in preview mode, render all of the pieces of the solved state
-                } else {
-                    for i in 0..p.solved_data.pieces.len() {
-                        if let Err(x) = p.render_piece(
-                            i,
-                            ui,
-                            cc,
-                            None,
-                            self.outline_width,
-                            OutlineStyle::Filled,
-                        ) {
-                            self.curr_msg = x;
-                        }
-                    }
-                }
+                if let Err(x) = p.render(ui, cc, self.outline_width, self.preview) {
+                    self.curr_msg = x;
+                };
             }
 
             //render the data storer panel -- this stores all of the puzzles that you can load
@@ -171,11 +154,11 @@ impl eframe::App for App {
             let delta_time = self.last_frame_time.elapsed(); //the time since the last frame
             self.last_frame_time = web_time::Instant::now(); //reset the time tracker
             if let Some(ref mut p) = self.puzzle
-                && p.anim_left >= 0.0
+                && p.position.anim_left >= 0.0
             {
                 //if the animation is still running, advance it according to delta_time and the animation speed
-                p.anim_left = f32::max(
-                    p.anim_left - (delta_time.as_secs_f32() * self.animation_speed as f32),
+                p.position.anim_left = f32::max(
+                    p.position.anim_left - (delta_time.as_secs_f32() * self.animation_speed as f32),
                     0.0,
                 );
             }
@@ -183,7 +166,7 @@ impl eframe::App for App {
                 && let Some(ref mut p) = self.puzzle
             {
                 //if the animation speed is fast enough, remove animations entirely
-                p.animation_offset = None;
+                p.position.animation_offset = None;
             }
             //self.curr_msg = String::from("HI");
             //UI Section: menu bar
@@ -312,9 +295,9 @@ impl eframe::App for App {
                     .default_pos((10.0, 40.0))
                     .auto_sized()
                     .show(ctx, |ui| {
-                        ui.label(String::from("Name: ") + &p.data.name);
-                        ui.label(String::from("Authors: ") + &p.data.authors.join(", "));
-                        ui.label(p.data.pieces.len().to_string() + " pieces");
+                        ui.label(String::from("Name: ") + &p.name);
+                        ui.label(String::from("Authors: ") + &p.authors.join(", "));
+                        ui.label(p.position.pieces.len().to_string() + " pieces");
                     });
 
                 if let Some(super_data) = &mut p.super_data {
@@ -351,9 +334,9 @@ impl eframe::App for App {
                         ui.separator();
                         if let Some(ref p) = self.puzzle {
                             //displays move count
-                            ui.label(p.stack.len().to_string() + " ETM");
+                            ui.label(p.position.stack.len().to_string() + " ETM");
                             //if the puzzle is solved, display as much (this is currently not working)
-                            if p.solved {
+                            if p.position.solved {
                                 ui.label("Solved!");
                             }
                         }
@@ -370,7 +353,7 @@ impl eframe::App for App {
             };
             //if the puzzle is currently turning, request a repaint so the animation runs
             if let Some(ref mut p) = self.puzzle
-                && p.anim_left != 0.0
+                && p.position.anim_left != 0.0
             {
                 ui.ctx().request_repaint();
             }
@@ -433,8 +416,8 @@ impl eframe::App for App {
                     {
                         let b = if let Some(p) = physical_key { p } else { key };
                         if pressed
-                            && let Some((t, m)) = p.data.keybinds.get(&b).cloned()
-                            && p.data.turns.contains_key(&t)
+                            && let Some((t, m)) = p.keybinds.get(&b).cloned()
+                            && p.turns.contains_key(&t)
                         {
                             if let Err(x) = p.turn_id(&t, self.cut_on_turn, m) {
                                 self.curr_msg = x;
@@ -464,6 +447,7 @@ impl eframe::App for App {
                                 None,
                                 self.outline_width,
                                 OutlineStyle::Hovered,
+                                self.preview,
                             ) {
                                 self.curr_msg = x;
                             }

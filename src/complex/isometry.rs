@@ -1,4 +1,4 @@
-use crate::complex::{c64::Scalar, rotation::Rotation};
+use crate::complex::{c64::Scalar, complex_circle::Circle, rotation::Rotation};
 use std::ops::Mul;
 
 use approx_collections::ApproxEq;
@@ -48,6 +48,16 @@ impl Isometry {
     pub fn rotation_angle(self) -> Scalar {
         self.a.angle()
     }
+
+    /// Right-multiply by an isometry in place.
+    pub fn right_mul_mut(&mut self, other: Self) {
+        *self = *self * other
+    }
+
+    /// Left-multiply by an isometry in place.
+    pub fn left_mul_mut(&mut self, other: Self) {
+        *self = other * *self
+    }
 }
 
 impl ApproxEq for Isometry {
@@ -78,5 +88,15 @@ impl Mul<Isometry> for Vector {
     type Output = Vector;
     fn mul(self, rhs: Isometry) -> Self::Output {
         Vector(self.0 * rhs.a)
+    }
+}
+
+impl Mul<Isometry> for Circle {
+    type Output = Circle;
+    fn mul(self, rhs: Isometry) -> Self::Output {
+        Circle {
+            center: self.center * rhs,
+            r_sq: self.r_sq,
+        }
     }
 }

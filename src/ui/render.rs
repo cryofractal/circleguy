@@ -3,6 +3,7 @@ use crate::PRECISION;
 use crate::complex::c64::C64;
 use crate::complex::complex_circle::Circle;
 use crate::complex::complex_circle::Contains;
+use crate::complex::isometry::Isometry;
 use crate::complex::point::Point;
 use crate::hps::data_storer::data_storer::DataStorer;
 use crate::hps::data_storer::data_storer::PuzzleLoadingData;
@@ -106,11 +107,18 @@ impl Point {
 
 impl Triangulation {
     ///render the triangulation, according to a detail and a color.
-    pub fn render_fill(&self, ui: &mut Ui, cc: CoordinateConverter, color: Color32) {
+    pub fn render_fill(
+        &self,
+        ui: &mut Ui,
+        cc: CoordinateConverter,
+        isometry: Isometry,
+        color: Color32,
+    ) {
         let mut triangle_vertices: Vec<epaint::Vertex> = Vec::new(); //make a new vector of epaint vertices
         for triangle in &self.inside {
             //iterate over the triangles
             for point in triangle {
+                let point = *point * isometry;
                 let vertex = epaint::Vertex {
                     pos: point.to_pos2(cc),
                     uv: pos2(0.0, 0.0),
@@ -130,13 +138,14 @@ impl Triangulation {
         &self,
         ui: &mut Ui,
         cc: CoordinateConverter,
+        isometry: Isometry,
         width: f32,
         color: Color32,
     ) {
         //now we render the outlines
         for arc in &self.border {
             ui.painter().add(PathShape::line(
-                arc.iter().map(|x| x.to_pos2(cc)).collect(),
+                arc.iter().map(|x| (*x * isometry).to_pos2(cc)).collect(),
                 Stroke::new(width, color),
             ));
         }
@@ -178,25 +187,26 @@ impl Puzzle {
         offset: Option<Turn>,
         outline_size: f32,
         outline_style: OutlineStyle,
+        solved: bool,
     ) -> Result<(), String> {
-        let Some(piece) = self.data.pieces.get(index) else {
+        let Some(piece) = self.position.pieces.get(index) else {
             return Ok(());
         };
 
-        //get the offset of the piece, base on if its in the animation_offset circle
-        let true_offset = if offset.is_none()
-            || piece.piece.shape.in_circle(offset.unwrap().circle)
-                == Some(crate::complex::complex_circle::Contains::Inside)
-        {
-            offset
+        let isometry = if solved {
+            Isometry::identity()
         } else {
-            None
-        };
-        let true_piece = if let Some(twist) = true_offset {
-            //turn the piece around the offset
-            twist.turn_render_piece(piece).unwrap_or(piece.clone())
-        } else {
-            piece.clone()
+            piece.isometry
+                * if let Some(offset) = offset
+                    && piece.in_circle(offset.circle)
+                        == Some(crate::complex::complex_circle::Contains::Inside)
+                {
+                    //get the offset of the piece, base on if its in the animation_offset circle
+
+                    offset.isometry()
+                } else {
+                    Isometry::identity()
+                }
         };
 
         let color = match &self.super_data {
@@ -213,14 +223,15 @@ impl Puzzle {
             None => piece.piece.color.to_egui(),
         };
 
-        for triangle in &true_piece.triangulations {
+        for triangle in &piece.triangulations {
             //iterate over the triangles
             if matches!(outline_style, OutlineStyle::Filled) {
-                triangle.render_fill(ui, cc, color);
+                triangle.render_fill(ui, cc, isometry, color);
             }
             triangle.render_outlines(
                 ui,
                 cc,
+                isometry,
                 outline_size * outline_style.width(),
                 outline_style.color(),
             );
@@ -236,12 +247,14 @@ impl Puzzle {
         ui: &mut Ui,
         cc: CoordinateConverter,
         outline_width: f32,
+        solved: bool,
     ) -> Result<(), String> {
         //get the offset from the animation_offset and anim_left
         let proper_offset = self
+            .position
             .animation_offset
-            .map(|off| off.mult(self.anim_left as f64));
-        for i in 0..self.data.pieces.len() {
+            .map(|off| off.mult(self.position.anim_left as f64));
+        for i in 0..self.position.pieces.len() {
             //render each piece
             self.render_piece(
                 i,
@@ -250,6 +263,7 @@ impl Puzzle {
                 proper_offset,
                 outline_width,
                 OutlineStyle::Filled,
+                solved,
             )?;
         }
         Ok(())
@@ -270,7 +284,7 @@ impl Puzzle {
         let mut min_dist: f64 = 10000.0;
         let mut min_rad: f64 = 10000.0;
         let mut correct_id: String = String::from("");
-        for turn in &self.data.turns {
+        for turn in &self.turns {
             //iterate over the turns to find the closest one
             let (center, radius) = (turn.1.turn.circle.center, turn.1.turn.circle.r());
             //compare how close they are
@@ -310,7 +324,7 @@ impl Puzzle {
         let mut min_dist: f64 = 10000.0;
         let mut min_rad: f64 = 10000.0;
         let mut correct_turn = None;
-        for turn in self.data.turns.clone().values() {
+        for turn in self.turns.clone().values() {
             //this algorithm proceeds very similarly to the process_click algorithm above
             let (cent, rad) = (turn.turn.circle.center, turn.turn.circle.r());
             if ((good_pos.dist(cent).approx_cmp(&min_dist, PRECISION) == Ordering::Less)
@@ -339,9 +353,9 @@ impl Puzzle {
     /// The index of the currently hovered piece.
     pub fn get_hovered_piece(&self, cc: CoordinateConverter, pos: Pos2) -> Option<usize> {
         let good_pos = Point::from_pos2(&pos, cc); //get the position
-        self.data.pieces.iter().position(|piece| {
+        self.position.pieces.iter().position(|piece| {
             matches!(
-                piece.piece.shape.contains(good_pos),
+                piece.contains(good_pos),
                 Contains::Inside | Contains::Border
             )
         })
@@ -350,9 +364,9 @@ impl Puzzle {
     /// The index of the currently hovered piece in the solved position.
     pub fn get_hovered_solved_piece(&self, cc: CoordinateConverter, pos: Pos2) -> Option<usize> {
         let good_pos = Point::from_pos2(&pos, cc); //get the position
-        self.solved_data.pieces.iter().position(|piece| {
+        self.position.pieces.iter().position(|piece| {
             matches!(
-                piece.piece.shape.contains(good_pos),
+                piece.contains(good_pos),
                 Contains::Inside | Contains::Border
             )
         })

@@ -15,19 +15,17 @@ pub struct PuzzleIOData {
 impl Puzzle {
     pub fn to_io_data(&self) -> PuzzleIOData {
         PuzzleIOData {
-            name: self.solved_data.name.clone(),
+            name: self.name.clone(),
             is_super: self.is_super(),
-            path: self.solved_data.path.clone(),
-            scramble: self.scramble.clone(),
-            stack: self.stack.clone(),
+            path: self.path.clone(),
+            scramble: self.position.scramble.clone(),
+            stack: self.position.stack.clone(),
         }
     }
     pub fn from_io_data(data: PuzzleIOData, ds: &mut DataStorer) -> Option<Puzzle> {
+        let def_entry = ds.puzzles.lock().unwrap().get(&data.path)?;
         let mut p = Puzzle::new(
-            ds.puzzles
-                .lock()
-                .unwrap()
-                .get(&data.path)?
+            def_entry
                 .load(
                     &mut ds.rt,
                     ds.keybinds.get_keybinds_for_puzzle(&data.path.file_name()?),
@@ -40,13 +38,13 @@ impl Puzzle {
                 p.turn_id(&s, false, 1).ok()?;
             }
         }
-        p.stack = Vec::new();
+        p.position.stack = Vec::new();
         for (s, m) in data.stack {
             p.turn_id(&s, false, m).ok()?;
         }
-        p.scramble = data.scramble;
-        p.animation_offset = None;
-        p.anim_left = 0.0;
+        p.position.scramble = data.scramble;
+        p.position.animation_offset = None;
+        p.position.anim_left = 0.0;
         Some(p)
     }
 }
