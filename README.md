@@ -2,6 +2,10 @@
 
 general puzzle simulator for circle puzzles. currently supports custom puzzle definitions and keybinds.
 
+# Super mode
+
+Right-click a puzzle in the puzzle menu to open it in super mode. From the super mode window, you can choose which pieces will be shown with orientation color and which will be shown in starburst by selecting `Select`. While selecting starburst pieces, right-click on a piece to make it the center of the starburst. `All` makes all pieces show the chosen scheme.
+
 # Keybinds
 
 keybinds are configured in the Configs/keybinds.kdl file.
