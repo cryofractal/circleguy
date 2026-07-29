@@ -265,7 +265,7 @@ impl eframe::App for App {
                     ui.add(egui::Slider::new(&mut self.offset.y, (-2.0)..=2.0).text("Move Y"));
                     ui.add(egui::Slider::new(&mut self.offset.x, (-2.0)..=2.0).text("Move X"));
                     //preview solved state toggle
-                    ui.checkbox(&mut self.preview, "Preview solved state?");
+                    ui.checkbox(&mut self.preview, "Preview solved state");
                     //cut on turn toggle
                     //reset view button
                     if ui.add(egui::Button::new("Reset View")).clicked() {
@@ -346,7 +346,11 @@ impl eframe::App for App {
                     Window::new("Super Data")
                         .default_pos((10.0, 200.0))
                         .auto_sized()
+                        .max_width(250.0)
                         .show(ctx, |ui| {
+                            ui.checkbox(&mut self.preview, "Preview solved state");
+
+                            ui.separator();
                             if matches!(
                                 self.mouse_function,
                                 MouseFunction::Super(SuperMouseFunction::OrientationColor)
