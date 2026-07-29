@@ -83,32 +83,40 @@ impl Puzzle {
     pub fn turn(&mut self, turn: OrderedTurn, cut: bool) -> Result<bool, String> {
         let mut new_pieces = Vec::new();
         let mut cut_pieces = Vec::new(); // Pieces that go on the end of the list
-        for piece in &self.position.pieces {
-            let circle = turn.turn.circle * turn.turn.isometry().inverse();
+        let mut split_indices = Vec::new();
+        for (i, piece) in self.position.pieces.iter().enumerate() {
             match piece.in_circle(turn.turn.circle) {
                 None => {
                     if cut {
                         // Cut the piece
+                        let circle = turn.turn.circle * piece.isometry.inverse();
                         let (shape_in, shape_out) = piece
                             .piece
                             .shape
                             .cut_by_circle(circle)
                             .ok_or("Cut failed: shape crossed cut but was not cut!")?;
 
-                        let mut piece_in = Piece {
-                            shape: shape_in,
-                            color: piece.piece.color,
-                        }
-                        .triangulate(DETAIL);
-                        piece_in.isometry.right_mul_mut(turn.turn.isometry());
-                        new_pieces.push(piece_in);
+                        split_indices.push((i, self.position.pieces.len() + cut_pieces.len()));
 
-                        let piece_out = Piece {
-                            shape: shape_out,
-                            color: piece.piece.color,
+                        {
+                            let mut piece_in = Piece {
+                                shape: shape_in,
+                                color: piece.piece.color,
+                            }
+                            .triangulate(DETAIL);
+                            piece_in.isometry = piece.isometry * turn.turn.isometry();
+                            new_pieces.push(piece_in);
                         }
-                        .triangulate(DETAIL);
-                        cut_pieces.push(piece_out);
+
+                        {
+                            let mut piece_out = Piece {
+                                shape: shape_out,
+                                color: piece.piece.color,
+                            }
+                            .triangulate(DETAIL);
+                            piece_out.isometry = piece.isometry;
+                            cut_pieces.push(piece_out);
+                        }
                     } else {
                         return Ok(false);
                     }
@@ -130,6 +138,13 @@ impl Puzzle {
         self.position.animation_offset = Some(turn.turn.inverse());
         self.intern_all(); //intern everything
         self.position.solved = false;
+
+        for (index, new_index) in split_indices {
+            self.super_data
+                .as_mut()
+                .map(|super_data| super_data.split_index(index, new_index));
+        }
+
         Ok(true)
     }
     ///turns the puzzle around a turn, given by an id. cuts along the turn first if cut is true.
