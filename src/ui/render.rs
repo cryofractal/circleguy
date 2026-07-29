@@ -1,5 +1,4 @@
 use crate::DEF_PATH;
-use crate::PRECISION;
 use crate::complex::c64::C64;
 use crate::complex::complex_circle::Circle;
 use crate::complex::complex_circle::Contains;
@@ -11,8 +10,6 @@ use crate::hps::data_storer::def_entry::DefEntry;
 use crate::puzzle::color::Color;
 use crate::puzzle::puzzle::*;
 use crate::puzzle::render_piece::Triangulation;
-use crate::puzzle::turn::*;
-use approx_collections::*;
 use core::f64;
 use egui::FontId;
 use egui::Popup;
@@ -93,7 +90,7 @@ impl Point {
         )
     }
     ///translates from egui coords to cga2d coords
-    fn from_pos2(pos: &Pos2, cc: CoordinateConverter) -> Self {
+    pub fn from_pos2(pos: &Pos2, cc: CoordinateConverter) -> Self {
         Self(C64 {
             re: (((pos.x - (cc.rect.width() / 2.0))
                 * (1920.0 / (cc.scale_factor * cc.rect.width())))
@@ -252,109 +249,6 @@ impl Puzzle {
             self.render_piece(i, ui, cc, outline_width, OutlineStyle::Filled, solved)?;
         }
         Ok(())
-    }
-    ///processes a click input and does the corresponding turns
-    ///Ok(true) means the turn was completed
-    ///Ok(false) means that the turn was bandanged, or no turn was found
-    ///Err(e) means that an error was encountered
-    ///'cut' is whether the turn should cut
-    pub fn process_click(
-        &mut self,
-        cc: CoordinateConverter,
-        pos: Pos2,
-        left: bool,
-        cut: bool,
-    ) -> Result<bool, String> {
-        let good_pos = Point::from_pos2(&pos, cc); //the cga2d position of the click
-        let mut min_dist: f64 = 10000.0;
-        let mut min_rad: f64 = 10000.0;
-        let mut correct_id: String = String::from("");
-        for turn in &self.turns {
-            //iterate over the turns to find the closest one
-            let (center, radius) = (turn.1.turn.circle.center, turn.1.turn.circle.r());
-            //compare how close they are
-            //ties are broken by the radius, smaller radius gets priority (so that concentric circles work)
-            if ((good_pos.dist(center).approx_cmp(&min_dist, PRECISION) == Ordering::Less)
-                || ((good_pos.dist(center).approx_eq(&min_dist, PRECISION))
-                    && (radius.approx_cmp(&min_rad, PRECISION)) == Ordering::Less))
-                && turn.1.turn.circle.contains(Point(C64 {
-                    re: good_pos.0.re as f64,
-                    im: good_pos.0.im as f64,
-                })) == Contains::Inside
-            {
-                min_dist = good_pos.dist(center);
-                min_rad = radius;
-                correct_id = turn.0.clone();
-            }
-        }
-        if correct_id.is_empty() {
-            //if no circle was found
-            return Ok(false);
-        }
-        if !left {
-            //invert based on the type of click
-            Ok(self.turn_id(&correct_id, cut, 1)?)
-        } else {
-            Ok(self.turn_id(&correct_id, cut, -1)?)
-        }
-    }
-    ///get the circle hovered by the mouse
-    ///picks amongst the valid turn circles of the puzzle
-    pub fn get_hovered(
-        &self,
-        cc: CoordinateConverter,
-        pos: Pos2,
-    ) -> Result<Option<Circle>, String> {
-        let good_pos = Point::from_pos2(&pos, cc); //get the position
-        let mut min_dist: f64 = 10000.0;
-        let mut min_rad: f64 = 10000.0;
-        let mut correct_turn = None;
-        for turn in self.turns.clone().values() {
-            //this algorithm proceeds very similarly to the process_click algorithm above
-            let (cent, rad) = (turn.turn.circle.center, turn.turn.circle.r());
-            if ((good_pos.dist(cent).approx_cmp(&min_dist, PRECISION) == Ordering::Less)
-                || ((good_pos.dist(cent).approx_eq(&min_dist, PRECISION))
-                    && (rad.approx_cmp(&min_rad, PRECISION)) == Ordering::Less))
-                && good_pos.dist(cent) < rad
-            {
-                min_dist = good_pos.dist(cent);
-                min_rad = rad;
-                correct_turn = Some(*turn);
-            }
-        }
-        if min_rad == 10000.0 {
-            return Ok(None);
-        }
-        Ok(Some(
-            match correct_turn {
-                None => return Ok(None),
-                Some(x) => x,
-            }
-            .turn
-            .circle,
-        ))
-    }
-
-    /// The index of the currently hovered piece.
-    pub fn get_hovered_piece(&self, cc: CoordinateConverter, pos: Pos2) -> Option<usize> {
-        let good_pos = Point::from_pos2(&pos, cc); //get the position
-        self.position.pieces.iter().position(|piece| {
-            matches!(
-                piece.contains(good_pos),
-                Contains::Inside | Contains::Border
-            )
-        })
-    }
-
-    /// The index of the currently hovered piece in the solved position.
-    pub fn get_hovered_solved_piece(&self, cc: CoordinateConverter, pos: Pos2) -> Option<usize> {
-        let good_pos = Point::from_pos2(&pos, cc); //get the position
-        self.position.pieces.iter().position(|piece| {
-            matches!(
-                piece.contains(good_pos),
-                Contains::Inside | Contains::Border
-            )
-        })
     }
 }
 

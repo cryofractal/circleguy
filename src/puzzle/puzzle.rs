@@ -1,14 +1,18 @@
 use crate::DETAIL;
+use crate::PRECISION;
+use crate::complex::c64::C64;
 use crate::complex::complex_circle::Contains;
-use crate::hps::custom_values::hpspuzzledata::HPSPuzzleData;
+use crate::complex::point::Point;
 use crate::hps::data_storer::data_storer::PuzzleData;
 use crate::puzzle::piece::Piece;
 use crate::puzzle::render_piece::RenderPiece;
 use crate::puzzle::super_data::SuperData;
 use crate::puzzle::turn::*;
+use approx_collections::ApproxOrd;
 use approx_collections::FloatPool;
 use rand::SeedableRng;
 use rand::prelude::IteratorRandom;
+use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::hash::DefaultHasher;
 use std::hash::Hash;
@@ -220,5 +224,47 @@ impl Puzzle {
     /// Is the puzzle in an animation right now
     pub fn in_animation(&self) -> bool {
         self.position.animation_offset.is_some() && self.position.anim_left > 0.0
+    }
+
+    /// Turn corresponding to a position
+    pub fn turn_at_point(&self, point: Point) -> Option<(String, OrderedTurn)> {
+        let mut min_dist: f64 = f64::INFINITY;
+        let mut min_rad: f64 = f64::INFINITY;
+        let mut out = None;
+        for (id, turn) in &self.turns {
+            //iterate over the turns to find the closest one
+            let circle = turn.turn.circle;
+            //compare how close they are
+            //ties are broken by the radius, smaller radius gets priority (so that concentric circles work)
+            let center_dist = point.dist(circle.center);
+            let center_cmp = center_dist.approx_cmp(&min_dist, PRECISION);
+            if (center_cmp == Ordering::Less
+                || (center_cmp == Ordering::Equal
+                    && circle.r().approx_cmp(&min_rad, PRECISION) == Ordering::Less))
+                && turn.turn.circle.contains(point) == Contains::Inside
+            {
+                min_dist = center_dist;
+                min_rad = circle.r();
+                out = Some((id.clone(), turn.clone()));
+            }
+        }
+
+        out
+    }
+
+    /// The index of the piece at `point`.
+    pub fn piece_at_point(&self, point: Point, solved: bool) -> Option<usize> {
+        if solved {
+            self.position.pieces.iter().position(|piece| {
+                matches!(
+                    piece.piece.shape.contains(point),
+                    Contains::Inside | Contains::Border
+                )
+            })
+        } else {
+            self.position.pieces.iter().position(|piece| {
+                matches!(piece.contains(point), Contains::Inside | Contains::Border)
+            })
+        }
     }
 }

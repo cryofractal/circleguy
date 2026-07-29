@@ -1,10 +1,11 @@
 use std::ffi::OsString;
 use std::path::PathBuf;
 
+use crate::complex::point::Point;
 use crate::hps::data_storer::data_storer::DataStorer;
 use crate::puzzle::puzzle::*;
 use crate::ui::render::{CoordinateConverter, OutlineStyle, draw_circle};
-use crate::{DEF_PATH, DEFAULT_PUZZLE};
+use crate::{DEF_PATH, DEFAULT_PUZZLE, hps};
 use egui::*;
 
 ///default scale factor
@@ -132,20 +133,28 @@ impl eframe::App for App {
                     ) {
                         self.curr_msg = x;
                     }
-
-                    match self.mouse_function {
-                        MouseFunction::Normal => {}
-                        MouseFunction::Super(mf) => {
-                            if let Some(super_data) = p.super_data.as_mut() {
-                                match mf {
-                                    SuperMouseFunction::OrientationColor => {
-                                        super_data.toggle_orientation_colored(hovered_piece);
-                                    }
-                                }
-                            }
-                        }
-                    }
                 }
+            }
+
+            // Manage puzzle animation
+            let delta_time = self.last_frame_time.elapsed(); //the time since the last frame
+            self.last_frame_time = web_time::Instant::now(); //reset the time tracker
+            if let Some(ref mut p) = self.puzzle
+                && p.position.anim_left >= 0.0
+            {
+                //if the animation is still running, advance it according to delta_time and the animation speed
+                p.position.anim_left = f32::max(
+                    p.position.anim_left - (delta_time.as_secs_f32() * self.animation_speed as f32),
+                    0.0,
+                );
+
+                ui.ctx().request_repaint();
+            }
+            if 24.9 < self.animation_speed
+                && let Some(ref mut p) = self.puzzle
+            {
+                //if the animation speed is fast enough, remove animations entirely
+                p.position.animation_offset = None;
             }
 
             //render the data storer panel -- this stores all of the puzzles that you can load
@@ -182,23 +191,7 @@ impl eframe::App for App {
             } else {
                 self.curr_msg = String::from("Error loading data storer!");
             }
-            let delta_time = self.last_frame_time.elapsed(); //the time since the last frame
-            self.last_frame_time = web_time::Instant::now(); //reset the time tracker
-            if let Some(ref mut p) = self.puzzle
-                && p.position.anim_left >= 0.0
-            {
-                //if the animation is still running, advance it according to delta_time and the animation speed
-                p.position.anim_left = f32::max(
-                    p.position.anim_left - (delta_time.as_secs_f32() * self.animation_speed as f32),
-                    0.0,
-                );
-            }
-            if 24.9 < self.animation_speed
-                && let Some(ref mut p) = self.puzzle
-            {
-                //if the animation speed is fast enough, remove animations entirely
-                p.position.animation_offset = None;
-            }
+
             //self.curr_msg = String::from("HI");
             //UI Section: menu bar
             egui::MenuBar::new().ui(ui, |ui| {
@@ -320,6 +313,7 @@ impl eframe::App for App {
                     // }
                 });
             });
+
             //UI Section: display puzzle info
             if let Some(ref mut p) = self.puzzle {
                 Window::new("Puzzle Info")
@@ -355,6 +349,7 @@ impl eframe::App for App {
                         });
                 }
             }
+
             //UI Section: Bottom left area
             ui.with_layout(egui::Layout::bottom_up(egui::Align::LEFT), |ui| {
                 egui::Frame::popup(ui.style())
@@ -377,132 +372,149 @@ impl eframe::App for App {
                         }
                     });
             });
+
             //gets the rect for interaction with the puzzle (so that ui elements like buttons dont conflict with puzzle input)
             let cor_rect = Rect {
                 min: pos2(180.0, 30.0),
                 max: pos2(rect.width() - 180.0, rect.height()),
             };
-            //if the puzzle is currently turning, request a repaint so the animation runs
-            if let Some(ref mut p) = self.puzzle
-                && p.position.anim_left != 0.0
-            {
-                ui.ctx().request_repaint();
-            }
+
             //get the interactor
             let r = ui.interact(cor_rect, egui::Id::new(19), egui::Sense::all());
-            //read scroll input and parse the sign
-            let scroll = ui.input(|input| {
-                input
-                    .raw
-                    .events
-                    .iter()
-                    .filter_map(|ev| match ev {
-                        Event::MouseWheel {
-                            unit: MouseWheelUnit::Line | MouseWheelUnit::Page,
-                            delta,
-                            modifiers: _,
-                        } => Some((delta.x + delta.y).signum() as i32),
-                        _ => None,
-                    })
-                    .sum::<i32>()
-            });
-            //if the puzzle is clicked and not in preview mode
-            if r.clicked()
-                && !self.preview
-                && let Some(pointer) = r.interact_pointer_pos()
-                && let Some(ref mut p) = self.puzzle
-                && let Err(x) = p.process_click(cc, pointer, true, self.cut_on_turn)
-            {
+            let _ = self.process_event(&r, ctx, ui, cc);
+        });
+    }
+}
+
+impl App {
+    fn set_message_err<T>(&mut self, value: Result<T, String>) -> Option<T> {
+        match value {
+            Ok(value) => Some(value),
+            Err(msg) => {
+                self.curr_msg = msg;
+                None
+            }
+        }
+    }
+
+    fn process_event(
+        &mut self,
+        r: &Response,
+        ctx: &Context,
+        ui: &mut Ui,
+        cc: CoordinateConverter,
+    ) -> Option<()> {
+        let puzzle = self.puzzle.as_mut()?;
+
+        // Interactions that work regardless of mode
+
+        if ui.input(|i: &InputState| i.key_pressed(egui::Key::Z)) {
+            let _ = puzzle.undo();
+            return Some(());
+        }
+
+        let mouse = mouse_interaction(&r, ctx, ui, cc)?;
+
+        if let MouseInteractionType::Scroll(scroll) = mouse.typ
+            && mouse.ctrl
+        {
+            self.scale_factor += 10.0 * scroll as f32;
+            return Some(());
+        }
+
+        //if the middle mouse button is being pressed, pan the camera
+        if r.dragged_by(egui::PointerButton::Middle) {
+            let delta = r.drag_delta();
+            let good_delta = vec2(delta.x / self.scale_factor, -(delta.y / self.scale_factor));
+            self.offset += good_delta;
+        }
+
+        //keybinds
+        if ui.ctx().memory(|x| x.focused().is_none()) {
+            let ev = ctx.input(|i| i.events.clone());
+            for event in ev {
+                if let Event::Key {
+                    key,
+                    physical_key,
+                    pressed,
+                    repeat: _,
+                    modifiers: _,
+                } = event
                 {
-                    self.curr_msg = x;
+                    let b = if let Some(p) = physical_key { p } else { key };
+                    if pressed
+                        && let Some((t, m)) = puzzle.keybinds.get(&b).cloned()
+                        && puzzle.turns.contains_key(&t)
+                    {
+                        if let Err(x) = puzzle.turn_id(&t, self.cut_on_turn, m) {
+                            self.curr_msg = x;
+                        }
+
+                        return Some(());
+                    }
                 }
             }
-            //the same input parsing but for the right click
-            if r.clicked_by(egui::PointerButton::Secondary)
-                && !self.preview
-                && let Some(pointer) = r.interact_pointer_pos()
-                && let Some(ref mut p) = self.puzzle
-                && let Err(x) = p.process_click(cc, pointer, false, self.cut_on_turn)
-            {
-                self.curr_msg = x;
-            }
-            if ui.input(|i: &InputState| i.key_pressed(egui::Key::Z))
-                && let Some(ref mut p) = self.puzzle
-            {
-                let _ = p.undo();
-            }
-            //keybinds
-            if let Some(ref mut p) = self.puzzle
-                && ui.ctx().memory(|x| x.focused().is_none())
-            {
-                let ev = ctx.input(|i| i.events.clone());
-                for event in ev {
-                    if let Event::Key {
-                        key,
-                        physical_key,
-                        pressed,
-                        repeat: _,
-                        modifiers: _,
-                    } = event
-                    {
-                        let b = if let Some(p) = physical_key { p } else { key };
-                        if pressed
-                            && let Some((t, m)) = p.keybinds.get(&b).cloned()
-                            && p.turns.contains_key(&t)
-                        {
-                            if let Err(x) = p.turn_id(&t, self.cut_on_turn, m) {
-                                self.curr_msg = x;
-                            }
+        }
+
+        // Mode-dependent interactions
+
+        // let mut error_message = None;
+        match self.mouse_function {
+            MouseFunction::Normal => match mouse.typ {
+                MouseInteractionType::Click => {
+                    if let Some((turn_id, _)) = puzzle.turn_at_point(mouse.position) {
+                        let turn_result = puzzle.turn_id(&turn_id, self.cut_on_turn, -1);
+                        self.set_message_err(turn_result);
+                    }
+                }
+                MouseInteractionType::SecondaryClick => {
+                    if let Some((turn_id, _)) = puzzle.turn_at_point(mouse.position) {
+                        let turn_result = puzzle.turn_id(&turn_id, self.cut_on_turn, 1);
+                        self.set_message_err(turn_result);
+                    }
+                }
+                MouseInteractionType::Hover => {
+                    if mouse.shift {
+                        if !puzzle.in_animation() {
+                            // Block hovering if animation is active
+                            // Shift held, highlight a piece
+                            self.hovered_piece = puzzle.piece_at_point(mouse.position, false);
+                        }
+                    } else {
+                        if let Some((_, turn)) = puzzle.turn_at_point(mouse.position) {
+                            draw_circle(turn.turn.circle, ui, cc);
                         }
                     }
                 }
-            }
-            //parse hovering. theres some casework here
-            if let Some(ref mut p) = self.puzzle
-                && r.hover_pos().is_some()
-                && !self.preview
-                && let Some(pointer) = r.hover_pos()
-            {
-                if ctx.input(|i| i.modifiers.shift) {
-                    if !p.in_animation() {
-                        // Block hovering if animation is active
-                        // Shift held, highlight a piece
-                        self.hovered_piece = p.get_hovered_piece(cc, pointer);
-                    }
-                } else {
-                    // No modifiers, render the circle
-                    let hovered_circle = p.get_hovered(cc, pointer);
-                    //get the hovered circle (turn circle)
-                    if let Err(x) = &hovered_circle {
-                        self.curr_msg = x.clone();
-                    }
-                    if let Ok(Some(real_circle)) = hovered_circle {
-                        draw_circle(real_circle, ui, cc);
-                    } //if a circle is hovered, highlight its border
-                    //if a circle is being hovered and the scroll wheel is being used, parse the scroll like a click
-                    //if the middle mouse button is pressed, or the control button is pressed, dont parse this input as these are camera commands
-                    if scroll != 0
-                        && !r.dragged_by(egui::PointerButton::Middle)
-                        && !ui.input(|i| i.modifiers.command_only())
-                        && !self.preview
-                        && let Some(pointer) = r.hover_pos()
-                        && let Err(x) = p.process_click(cc, pointer, scroll > 0, self.cut_on_turn)
-                    {
-                        self.curr_msg = x;
+                MouseInteractionType::Scroll(scroll) => {
+                    if let Some((turn_id, _)) = puzzle.turn_at_point(mouse.position) {
+                        let turn_result =
+                            puzzle.turn_id(&turn_id, self.cut_on_turn, scroll as isize);
+                        self.set_message_err(turn_result);
                     }
                 }
+            },
+            MouseFunction::Super(mf) => {
+                let hovered_piece = puzzle.piece_at_point(mouse.position, false);
+                let super_data = puzzle.super_data.as_mut()?;
+                match mf {
+                    SuperMouseFunction::OrientationColor => match mouse.typ {
+                        MouseInteractionType::Click => {
+                            if let Some(hovered_piece) = hovered_piece {
+                                super_data.toggle_orientation_colored(hovered_piece);
+                            }
+                        }
+                        MouseInteractionType::SecondaryClick => {}
+                        MouseInteractionType::Hover => {
+                            self.hovered_piece = puzzle.piece_at_point(mouse.position, false);
+                        }
+                        MouseInteractionType::Scroll(_) => {}
+                    },
+                }
             }
-            //if the middle mouse button is being pressed, pan the camera
-            if r.dragged_by(egui::PointerButton::Middle) {
-                let delta = r.drag_delta();
-                let good_delta = vec2(delta.x / self.scale_factor, -(delta.y / self.scale_factor));
-                self.offset += good_delta;
-            }
-            //if ctrl scrolling, zoom
-            if ui.input(|i| i.modifiers.command_only()) && scroll != 0 {
-                self.scale_factor += 10.0 * scroll as f32;
-            }
-        });
+        }
+
+        Some(())
     }
 }
 
@@ -511,4 +523,73 @@ fn default_menu_button<'a>(text: &'a str) -> egui::containers::menu::MenuButton<
     let button = egui::containers::menu::MenuButton::new(text);
     let config = egui::containers::menu::MenuConfig::new();
     button.config(config.close_behavior(PopupCloseBehavior::CloseOnClickOutside))
+}
+
+#[derive(Debug, Clone, Copy)]
+struct MouseInteraction {
+    position: Point,
+    typ: MouseInteractionType,
+    shift: bool,
+    ctrl: bool,
+}
+
+#[derive(Debug, Clone, Copy)]
+enum MouseInteractionType {
+    Click,
+    SecondaryClick,
+    Hover,
+    Scroll(i32),
+}
+
+fn mouse_interaction(
+    r: &Response,
+    ctx: &Context,
+    ui: &mut Ui,
+    cc: CoordinateConverter,
+) -> Option<MouseInteraction> {
+    let shift = ctx.input(|i| i.modifiers.shift);
+    let ctrl = ctx.input(|i| i.modifiers.shift);
+
+    let scroll = ui.input(|input| {
+        input
+            .raw
+            .events
+            .iter()
+            .filter_map(|ev| match ev {
+                Event::MouseWheel {
+                    unit: MouseWheelUnit::Line | MouseWheelUnit::Page,
+                    delta,
+                    modifiers: _,
+                } => Some((delta.x + delta.y).signum() as i32),
+                _ => None,
+            })
+            .sum::<i32>()
+    });
+
+    let typ;
+    let raw_position;
+    if scroll != 0 {
+        raw_position = r.hover_pos();
+        typ = MouseInteractionType::Scroll(scroll);
+    } else {
+        if r.clicked() {
+            raw_position = r.interact_pointer_pos();
+            typ = MouseInteractionType::Click;
+        } else if r.secondary_clicked() {
+            raw_position = r.interact_pointer_pos();
+            typ = MouseInteractionType::SecondaryClick;
+        } else {
+            raw_position = r.hover_pos();
+            typ = MouseInteractionType::Hover;
+        }
+    }
+
+    let position = Point::from_pos2(&raw_position?, cc);
+
+    Some(MouseInteraction {
+        position,
+        typ,
+        shift,
+        ctrl,
+    })
 }

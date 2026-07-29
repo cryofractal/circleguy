@@ -193,6 +193,7 @@ impl RenderPiece {
         self.piece.in_circle(circle * self.isometry.inverse())
     }
 
+    /// Whether the piece contains the point, taking isometry into account.
     pub fn contains(&self, point: Point) -> Contains {
         self.piece.shape.contains(point * self.isometry.inverse())
     }
