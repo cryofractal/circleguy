@@ -44,7 +44,7 @@ impl Isometry {
         }
     }
 
-    /// The angle of rotation of this isometry.
+    /// The angle of rotation of this isometry in the interval [-π, π].
     pub fn rotation_angle(self) -> Scalar {
         self.a.angle()
     }

@@ -1,7 +1,7 @@
 use crate::DEF_PATH;
+use crate::PRECISION;
 use crate::complex::c64::C64;
 use crate::complex::complex_circle::Circle;
-use crate::complex::complex_circle::Contains;
 use crate::complex::isometry::Isometry;
 use crate::complex::point::Point;
 use crate::hps::data_storer::data_storer::DataStorer;
@@ -10,6 +10,7 @@ use crate::hps::data_storer::def_entry::DefEntry;
 use crate::puzzle::color::Color;
 use crate::puzzle::puzzle::*;
 use crate::puzzle::render_piece::Triangulation;
+use approx_collections::ApproxEq;
 use core::f64;
 use egui::FontId;
 use egui::Popup;
@@ -210,9 +211,15 @@ impl Puzzle {
         let color = match &self.super_data {
             Some(super_data) => {
                 if super_data.orientation_colored.contains(&index) {
-                    let colorous::Color { r, g, b } = colorous::RAINBOW
-                        .eval_continuous((isometry.rotation_angle() / (2.0 * PI) + 2.0).fract()); // make sure it's in the range 0.0..1.0
-                    Color32::from_rgb(r, g, b)
+                    let angle = isometry.rotation_angle();
+                    // angle is in [-π, π]
+                    if angle.approx_eq(&0.0, PRECISION) {
+                        Color::White.to_egui()
+                    } else {
+                        let colorous::Color { r, g, b } =
+                            colorous::RAINBOW.eval_continuous((angle / (2.0 * PI) + 2.0).fract()); // make sure it's in the range 0.0..1.0
+                        Color32::from_rgb(r, g, b)
+                    }
                 } else {
                     Color32::DARK_GRAY
                 }

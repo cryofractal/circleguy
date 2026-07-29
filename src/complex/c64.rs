@@ -96,7 +96,7 @@ impl C64 {
             im: angle.sin(),
         }
     }
-    ///get the angle of a complex number
+    ///get the angle of a complex number in the interval [-π, π].
     pub fn angle(&self) -> Scalar {
         self.im.atan2(self.re)
     }
