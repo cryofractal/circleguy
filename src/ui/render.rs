@@ -207,9 +207,8 @@ impl Puzzle {
         let color = match &self.super_data {
             Some(super_data) => {
                 if super_data.orientation_colored.contains(&index) {
-                    let colorous::Color { r, g, b } = colorous::RAINBOW.eval_continuous(
-                        (piece.isometry.rotation_angle() / (2.0 * PI) + 2.0).fract(),
-                    ); // make sure it's in the range 0.0..1.0
+                    let colorous::Color { r, g, b } = colorous::RAINBOW
+                        .eval_continuous((isometry.rotation_angle() / (2.0 * PI) + 2.0).fract()); // make sure it's in the range 0.0..1.0
                     Color32::from_rgb(r, g, b)
                 } else {
                     Color32::DARK_GRAY
