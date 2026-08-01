@@ -517,7 +517,8 @@ impl App {
                 } = event
                 {
                     let b = if let Some(p) = physical_key { p } else { key };
-                    if pressed
+                    if !self.preview
+                        && pressed
                         && let Some((t, m)) = puzzle.keybinds.get(&b).cloned()
                         && puzzle.turns.contains_key(&t)
                     {
@@ -539,13 +540,17 @@ impl App {
         match self.mouse_function {
             MouseFunction::Normal => match mouse.typ {
                 MouseInteractionType::Click => {
-                    if let Some((turn_id, _)) = puzzle.turn_at_point(mouse.position) {
+                    if !self.preview
+                        && let Some((turn_id, _)) = puzzle.turn_at_point(mouse.position)
+                    {
                         let turn_result = puzzle.turn_id(&turn_id, self.cut_on_turn, -1);
                         self.set_message_err(turn_result);
                     }
                 }
                 MouseInteractionType::SecondaryClick => {
-                    if let Some((turn_id, _)) = puzzle.turn_at_point(mouse.position) {
+                    if !self.preview
+                        && let Some((turn_id, _)) = puzzle.turn_at_point(mouse.position)
+                    {
                         let turn_result = puzzle.turn_id(&turn_id, self.cut_on_turn, 1);
                         self.set_message_err(turn_result);
                     }
@@ -566,7 +571,9 @@ impl App {
                 }
                 MouseInteractionType::DragOver => {}
                 MouseInteractionType::Scroll(scroll) => {
-                    if let Some((turn_id, _)) = puzzle.turn_at_point(mouse.position) {
+                    if !self.preview
+                        && let Some((turn_id, _)) = puzzle.turn_at_point(mouse.position)
+                    {
                         let turn_result =
                             puzzle.turn_id(&turn_id, self.cut_on_turn, scroll as isize);
                         self.set_message_err(turn_result);
