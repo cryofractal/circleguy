@@ -97,16 +97,10 @@ impl App {
     }
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum MouseFunction {
     Normal,
-    Super(SuperMouseFunction),
-}
-
-#[derive(Debug, Copy, Clone)]
-pub enum SuperMouseFunction {
-    OrientationColor,
-    Starburst,
+    Super(SuperStyle),
 }
 
 impl eframe::App for App {
@@ -369,15 +363,14 @@ impl eframe::App for App {
                                     );
                                     let selected = matches!(
                                         self.mouse_function,
-                                        MouseFunction::Super(SuperMouseFunction::OrientationColor)
+                                        MouseFunction::Super(SuperStyle::OrientationColor)
                                     );
                                     if ui.add(Button::new("Select").selected(selected)).clicked() {
                                         if selected {
                                             self.mouse_function = MouseFunction::Normal;
                                         } else {
-                                            self.mouse_function = MouseFunction::Super(
-                                                SuperMouseFunction::OrientationColor,
-                                            );
+                                            self.mouse_function =
+                                                MouseFunction::Super(SuperStyle::OrientationColor);
                                         }
                                     };
                                     if ui
@@ -399,14 +392,14 @@ impl eframe::App for App {
                                     ui.label(super_data.selected_string(SuperStyle::Starburst));
                                     let selected = matches!(
                                         self.mouse_function,
-                                        MouseFunction::Super(SuperMouseFunction::Starburst)
+                                        MouseFunction::Super(SuperStyle::Starburst)
                                     );
                                     if ui.add(Button::new("Select").selected(selected)).clicked() {
                                         if selected {
                                             self.mouse_function = MouseFunction::Normal;
                                         } else {
                                             self.mouse_function =
-                                                MouseFunction::Super(SuperMouseFunction::Starburst);
+                                                MouseFunction::Super(SuperStyle::Starburst);
                                         }
                                     };
                                     if ui
@@ -420,6 +413,41 @@ impl eframe::App for App {
                                         super_data.toggle_all(SuperStyle::Starburst);
                                     };
                                 })
+                            });
+
+                            ui.horizontal(|ui| {
+                                ui.label("Solid color");
+                                if ui.button("+").clicked() {
+                                    super_data.add_color();
+                                }
+                            });
+                            ui.indent("Solid color", |ui| {
+                                for (style, color) in super_data.vec_solid_colors() {
+                                    ui.horizontal(|ui| {
+                                        ui.label(super_data.selected_string(style));
+                                        let selected =
+                                            self.mouse_function == MouseFunction::Super(style);
+                                        if ui
+                                            .add(Button::new("Select").selected(selected))
+                                            .clicked()
+                                        {
+                                            if selected {
+                                                self.mouse_function = MouseFunction::Normal;
+                                            } else {
+                                                self.mouse_function = MouseFunction::Super(style);
+                                            }
+                                        };
+                                        if ui
+                                            .add(Button::new("All").selected(
+                                                super_data.piece_style_all == Some(style),
+                                            ))
+                                            .clicked()
+                                        {
+                                            self.mouse_function = MouseFunction::Normal;
+                                            super_data.toggle_all(style);
+                                        };
+                                    });
+                                }
                             });
                         });
                 }
@@ -580,82 +608,43 @@ impl App {
                     }
                 }
             },
-            MouseFunction::Super(mf) => {
+            MouseFunction::Super(style) => {
                 let hovered_piece = puzzle.piece_at_point(mouse.position, self.preview);
                 let super_data = puzzle.super_data.as_mut()?;
 
-                match mf {
-                    SuperMouseFunction::OrientationColor => match mouse.typ {
-                        MouseInteractionType::Click => {
-                            if let Some(hovered_piece) = hovered_piece {
-                                super_data.toggle(hovered_piece, SuperStyle::OrientationColor);
-                            }
-                        }
-                        MouseInteractionType::SecondaryClick => {}
-                        MouseInteractionType::Hover => {
-                            self.hovered_piece =
-                                puzzle.piece_at_point(mouse.position, self.preview);
-                        }
-                        MouseInteractionType::DragOver => {
-                            if let Some(hovered_piece) = hovered_piece {
-                                match self.inserting_on_drag {
-                                    Some(insert) => {
-                                        super_data.toggle_to(
-                                            hovered_piece,
-                                            SuperStyle::OrientationColor,
-                                            insert,
-                                        );
-                                    }
-                                    None => {
-                                        self.inserting_on_drag =
-                                            Some(super_data.toggle(
-                                                hovered_piece,
-                                                SuperStyle::OrientationColor,
-                                            ))
-                                    }
-                                }
-                            }
-                        }
-                        MouseInteractionType::Scroll(_) => {}
-                    },
-                    SuperMouseFunction::Starburst => match mouse.typ {
-                        MouseInteractionType::Click => {
-                            if let Some(hovered_piece) = hovered_piece {
-                                if super_data.styled_count(SuperStyle::Starburst) == 0 {
-                                    super_data.starburst_center = hovered_piece;
-                                }
-                                super_data.toggle(hovered_piece, SuperStyle::Starburst);
-                            }
-                        }
-                        MouseInteractionType::SecondaryClick => {
-                            if let Some(hovered_piece) = hovered_piece {
+                match mouse.typ {
+                    MouseInteractionType::Click => {
+                        if let Some(hovered_piece) = hovered_piece {
+                            if super_data.styled_count(style) == 0 {
                                 super_data.starburst_center = hovered_piece;
                             }
+                            super_data.toggle(hovered_piece, style);
                         }
-                        MouseInteractionType::Hover => {
-                            self.hovered_piece =
-                                puzzle.piece_at_point(mouse.position, self.preview);
+                    }
+                    MouseInteractionType::SecondaryClick => {
+                        if matches!(style, SuperStyle::Starburst)
+                            && let Some(hovered_piece) = hovered_piece
+                        {
+                            super_data.starburst_center = hovered_piece;
                         }
-                        MouseInteractionType::DragOver => {
-                            if let Some(hovered_piece) = hovered_piece {
-                                match self.inserting_on_drag {
-                                    Some(insert) => {
-                                        super_data.toggle_to(
-                                            hovered_piece,
-                                            SuperStyle::Starburst,
-                                            insert,
-                                        );
-                                    }
-                                    None => {
-                                        self.inserting_on_drag = Some(
-                                            super_data.toggle(hovered_piece, SuperStyle::Starburst),
-                                        )
-                                    }
+                    }
+                    MouseInteractionType::Hover => {
+                        self.hovered_piece = puzzle.piece_at_point(mouse.position, self.preview);
+                    }
+                    MouseInteractionType::DragOver => {
+                        if let Some(hovered_piece) = hovered_piece {
+                            match self.inserting_on_drag {
+                                Some(insert) => {
+                                    super_data.toggle_to(hovered_piece, style, insert);
+                                }
+                                None => {
+                                    self.inserting_on_drag =
+                                        Some(super_data.toggle(hovered_piece, style))
                                 }
                             }
                         }
-                        MouseInteractionType::Scroll(_) => {}
-                    },
+                    }
+                    MouseInteractionType::Scroll(_) => {}
                 }
             }
         }

@@ -1,4 +1,7 @@
+use egui::Color32;
 use std::collections::HashMap;
+
+use crate::puzzle::color::rainbow_float;
 
 /// Data on color scheme for super puzzles
 #[derive(Debug, Clone)]
@@ -6,12 +9,14 @@ pub struct SuperData {
     pub piece_styles: HashMap<usize, SuperStyle>,
     pub piece_style_all: Option<SuperStyle>,
     pub starburst_center: usize,
+    pub solid_colors: Vec<Color32>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SuperStyle {
     OrientationColor,
     Starburst,
+    SolidColor(usize),
 }
 
 impl SuperData {
@@ -20,6 +25,7 @@ impl SuperData {
             piece_styles: HashMap::new(),
             piece_style_all: None,
             starburst_center: 0,
+            solid_colors: Vec::new(),
         }
     }
 
@@ -73,5 +79,19 @@ impl SuperData {
             .get(&index)
             .copied()
             .or(self.piece_style_all)
+    }
+
+    pub fn add_color(&mut self) {
+        let next_unused = rainbow_float(0.61803398874989484 * self.solid_colors.len() as f64);
+        self.solid_colors.push(next_unused);
+    }
+
+    pub fn vec_solid_colors(&self) -> Vec<(SuperStyle, Color32)> {
+        // Cannot borrow self so cannot return iterator
+        self.solid_colors
+            .iter()
+            .enumerate()
+            .map(|(i, c)| (SuperStyle::SolidColor(i), *c))
+            .collect()
     }
 }

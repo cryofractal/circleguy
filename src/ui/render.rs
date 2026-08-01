@@ -11,6 +11,8 @@ use crate::hps::data_storer::data_storer::DataStorer;
 use crate::hps::data_storer::data_storer::PuzzleLoadingData;
 use crate::hps::data_storer::def_entry::DefEntry;
 use crate::puzzle::color::Color;
+use crate::puzzle::color::rainbow_float;
+use crate::puzzle::color::rainbow_rational;
 use crate::puzzle::piece::Piece;
 use crate::puzzle::puzzle::*;
 use crate::puzzle::render_piece::Triangulation;
@@ -35,37 +37,6 @@ const STARBURST_CUT_RADIUS: f64 = 1000.0;
 pub struct RenderingCircle {
     pub cent: Pos2,
     pub rad: f32,
-}
-
-impl Color {
-    pub fn to_egui(&self) -> Color32 {
-        match self {
-            Color::Red => Color32::RED,
-            Color::Green => Color32::GREEN,
-            Color::Blue => Color32::BLUE,
-            Color::Yellow => Color32::YELLOW,
-            Color::Purple => Color32::PURPLE,
-            Color::Gray => Color32::GRAY,
-            Color::Black => Color32::BLACK,
-            Color::Brown => Color32::BROWN,
-            Color::Cyan => Color32::CYAN,
-            Color::White => Color32::WHITE,
-            Color::DarkBlue => Color32::DARK_BLUE,
-            Color::DarkGreen => Color32::DARK_GREEN,
-            Color::DarkGray => Color32::DARK_GRAY,
-            Color::DarkRed => Color32::DARK_RED,
-            Color::LightBlue => Color32::LIGHT_BLUE,
-            Color::LightGray => Color32::LIGHT_GRAY,
-            Color::LightGreen => Color32::LIGHT_GREEN,
-            Color::LightYellow => Color32::LIGHT_YELLOW,
-            Color::LightRed => Color32::LIGHT_RED,
-            Color::Khaki => Color32::KHAKI,
-            Color::Gold => Color32::GOLD,
-            Color::Magenta => Color32::MAGENTA,
-            Color::Orange => Color32::ORANGE,
-            Color::None => Color32::GRAY,
-        }
-    }
 }
 
 ///draws a the circumference of a circle given the coordinates
@@ -237,9 +208,7 @@ impl Puzzle {
                         let color = if angle.approx_eq(&0.0, PRECISION) {
                             Color::White.to_egui()
                         } else {
-                            let colorous::Color { r, g, b } = colorous::RAINBOW
-                                .eval_continuous((angle / (2.0 * PI) + 2.0).fract()); // make sure it's in the range 0.0..1.0
-                            Color32::from_rgb(r, g, b)
+                            rainbow_float(angle / (2.0 * PI))
                         };
                         vec![(piece.clone(), color)]
                     }
@@ -267,10 +236,7 @@ impl Puzzle {
                                 continue;
                             };
 
-                            let colorous::Color { r, g, b } =
-                                colorous::RAINBOW.eval_rational(i, STARBURST_SIZE); // make sure it's in the range 0.0..1.0
-                            let color = Color32::from_rgb(r, g, b);
-
+                            let color = rainbow_rational(i, STARBURST_SIZE);
                             pieces.push((
                                 Piece {
                                     shape,
@@ -281,6 +247,16 @@ impl Puzzle {
                             )) // TODO: dummy color
                         }
                         pieces
+                    }
+                    Some(SuperStyle::SolidColor(i)) => {
+                        vec![(
+                            piece.clone(),
+                            super_data
+                                .solid_colors
+                                .get(i)
+                                .cloned()
+                                .unwrap_or(Color::None.to_egui()),
+                        )]
                     }
                 }
             }
