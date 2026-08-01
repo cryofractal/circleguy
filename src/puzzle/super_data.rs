@@ -59,7 +59,7 @@ impl SuperData {
         }
     }
 
-    pub fn toggle_all(&mut self, style: SuperStyle) {
+    pub fn toggle_style_all(&mut self, style: SuperStyle) {
         if self.piece_style_all == Some(style) {
             self.piece_style_all = None;
         } else {
@@ -67,7 +67,7 @@ impl SuperData {
         }
     }
 
-    pub fn toggle(&mut self, index: usize, style: SuperStyle) -> bool {
+    pub fn toggle_style(&mut self, index: usize, style: SuperStyle) -> bool {
         if self.piece_styles.get(&index) == Some(&style) {
             self.remove_style(index);
             false
@@ -77,7 +77,7 @@ impl SuperData {
         }
     }
 
-    pub fn toggle_to(&mut self, index: usize, style: SuperStyle, insert: bool) {
+    pub fn toggle_style_to(&mut self, index: usize, style: SuperStyle, insert: bool) {
         if insert {
             self.set_style(index, style);
         } else if self.piece_styles.get(&index) == Some(&style) {
@@ -85,7 +85,7 @@ impl SuperData {
         }
     }
 
-    pub fn get(&self, index: usize) -> Option<SuperStyle> {
+    pub fn get_style(&self, index: usize) -> Option<SuperStyle> {
         self.piece_styles
             .get(&index)
             .copied()

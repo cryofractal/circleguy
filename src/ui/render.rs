@@ -198,7 +198,7 @@ impl Puzzle {
 
         let pieces = match &self.super_data {
             Some(super_data) => {
-                match super_data.get(index) {
+                match super_data.get_style(index) {
                     None => {
                         vec![(piece.clone(), Color32::DARK_GRAY)]
                     }

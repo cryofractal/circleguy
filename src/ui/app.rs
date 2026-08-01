@@ -575,7 +575,7 @@ impl App {
                 match mouse.typ {
                     MouseInteractionType::Click => {
                         if let Some(hovered_piece) = hovered_piece {
-                            super_data.toggle(hovered_piece, style);
+                            super_data.toggle_style(hovered_piece, style);
                         }
                     }
                     MouseInteractionType::SecondaryClick => {
@@ -592,11 +592,11 @@ impl App {
                         if let Some(hovered_piece) = hovered_piece {
                             match self.inserting_on_drag {
                                 Some(insert) => {
-                                    super_data.toggle_to(hovered_piece, style, insert);
+                                    super_data.toggle_style_to(hovered_piece, style, insert);
                                 }
                                 None => {
                                     self.inserting_on_drag =
-                                        Some(super_data.toggle(hovered_piece, style))
+                                        Some(super_data.toggle_style(hovered_piece, style))
                                 }
                             }
                         }
@@ -644,7 +644,7 @@ fn super_style_manager(
             .clicked()
         {
             *mouse_function = MouseFunction::Normal;
-            super_data.toggle_all(style);
+            super_data.toggle_style_all(style);
         };
     });
 }
