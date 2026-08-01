@@ -1,5 +1,4 @@
 use egui::Color32;
-use std::f64::consts::PI;
 
 #[derive(Clone, Debug, Copy, PartialEq, Eq)]
 pub enum Color {
@@ -61,8 +60,7 @@ impl Color {
 }
 
 pub fn rainbow_float(x: f64) -> Color32 {
-    let colorous::Color { r, g, b } =
-        colorous::RAINBOW.eval_continuous((x / (2.0 * PI) + 2.0).fract()); // make sure it's in the range 0.0..1.0
+    let colorous::Color { r, g, b } = colorous::RAINBOW.eval_continuous((x + 2.0).fract()); // make sure it's in the range 0.0..1.0
     Color32::from_rgb(r, g, b)
 }
 

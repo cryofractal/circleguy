@@ -86,12 +86,29 @@ impl SuperData {
         self.solid_colors.push(next_unused);
     }
 
-    pub fn vec_solid_colors(&self) -> Vec<(SuperStyle, Color32)> {
+    pub fn remove_color(&mut self, i: usize) {
+        if i < self.solid_colors.len() {
+            self.solid_colors.remove(i);
+            self.piece_styles = self
+                .piece_styles
+                .iter()
+                .filter_map(|(p, style)| match style {
+                    SuperStyle::SolidColor(j) if *j > i => {
+                        Some((*p, SuperStyle::SolidColor(j - 1)))
+                    }
+                    SuperStyle::SolidColor(j) if *j == i => None,
+                    _ => Some((*p, *style)),
+                })
+                .collect();
+        }
+    }
+
+    pub fn vec_solid_colors(&self) -> Vec<(usize, SuperStyle, Color32)> {
         // Cannot borrow self so cannot return iterator
         self.solid_colors
             .iter()
             .enumerate()
-            .map(|(i, c)| (SuperStyle::SolidColor(i), *c))
+            .map(|(i, c)| (i, SuperStyle::SolidColor(i), *c))
             .collect()
     }
 }

@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use crate::complex::point::Point;
 use crate::hps::data_storer::data_storer::DataStorer;
 use crate::puzzle::puzzle::*;
-use crate::puzzle::super_data::SuperStyle;
+use crate::puzzle::super_data::{SuperData, SuperStyle};
 use crate::ui::render::{CoordinateConverter, OutlineStyle, draw_circle};
 use crate::{DEF_PATH, DEFAULT_PUZZLE};
 use egui::*;
@@ -345,7 +345,7 @@ impl eframe::App for App {
                         ui.label(p.position.pieces.len().to_string() + " pieces");
                     });
 
-                if let Some(super_data) = &mut p.super_data {
+                if let Some(mut super_data) = p.super_data.as_mut() {
                     Window::new("Super Data")
                         .default_pos((10.0, 200.0))
                         .auto_sized()
@@ -357,61 +357,23 @@ impl eframe::App for App {
 
                             ui.label("Orientation color");
                             ui.indent("Orientation color", |ui| {
-                                ui.horizontal(|ui| {
-                                    ui.label(
-                                        super_data.selected_string(SuperStyle::OrientationColor),
-                                    );
-                                    let selected = matches!(
-                                        self.mouse_function,
-                                        MouseFunction::Super(SuperStyle::OrientationColor)
-                                    );
-                                    if ui.add(Button::new("Select").selected(selected)).clicked() {
-                                        if selected {
-                                            self.mouse_function = MouseFunction::Normal;
-                                        } else {
-                                            self.mouse_function =
-                                                MouseFunction::Super(SuperStyle::OrientationColor);
-                                        }
-                                    };
-                                    if ui
-                                        .add(Button::new("All").selected(
-                                            super_data.piece_style_all
-                                                == Some(SuperStyle::OrientationColor),
-                                        ))
-                                        .clicked()
-                                    {
-                                        self.mouse_function = MouseFunction::Normal;
-                                        super_data.toggle_all(SuperStyle::OrientationColor);
-                                    };
-                                })
+                                super_style_manager(
+                                    ui,
+                                    &mut self.mouse_function,
+                                    &mut super_data,
+                                    SuperStyle::OrientationColor,
+                                );
                             });
 
                             ui.label("Starburst");
                             ui.indent("Starburst", |ui| {
                                 ui.horizontal(|ui| {
-                                    ui.label(super_data.selected_string(SuperStyle::Starburst));
-                                    let selected = matches!(
-                                        self.mouse_function,
-                                        MouseFunction::Super(SuperStyle::Starburst)
+                                    super_style_manager(
+                                        ui,
+                                        &mut self.mouse_function,
+                                        &mut super_data,
+                                        SuperStyle::Starburst,
                                     );
-                                    if ui.add(Button::new("Select").selected(selected)).clicked() {
-                                        if selected {
-                                            self.mouse_function = MouseFunction::Normal;
-                                        } else {
-                                            self.mouse_function =
-                                                MouseFunction::Super(SuperStyle::Starburst);
-                                        }
-                                    };
-                                    if ui
-                                        .add(Button::new("All").selected(
-                                            super_data.piece_style_all
-                                                == Some(SuperStyle::Starburst),
-                                        ))
-                                        .clicked()
-                                    {
-                                        self.mouse_function = MouseFunction::Normal;
-                                        super_data.toggle_all(SuperStyle::Starburst);
-                                    };
                                 })
                             });
 
@@ -422,30 +384,28 @@ impl eframe::App for App {
                                 }
                             });
                             ui.indent("Solid color", |ui| {
-                                for (style, color) in super_data.vec_solid_colors() {
+                                for (i, style, color) in super_data.vec_solid_colors() {
                                     ui.horizontal(|ui| {
-                                        ui.label(super_data.selected_string(style));
-                                        let selected =
-                                            self.mouse_function == MouseFunction::Super(style);
-                                        if ui
-                                            .add(Button::new("Select").selected(selected))
-                                            .clicked()
-                                        {
-                                            if selected {
-                                                self.mouse_function = MouseFunction::Normal;
-                                            } else {
-                                                self.mouse_function = MouseFunction::Super(style);
+                                        let mut rgb = [color.r(), color.g(), color.b()];
+                                        if ui.color_edit_button_srgb(&mut rgb).changed() {
+                                            if let Some(color_mut) =
+                                                super_data.solid_colors.get_mut(i)
+                                            {
+                                                *color_mut =
+                                                    Color32::from_rgb(rgb[0], rgb[1], rgb[2]);
                                             }
-                                        };
-                                        if ui
-                                            .add(Button::new("All").selected(
-                                                super_data.piece_style_all == Some(style),
-                                            ))
-                                            .clicked()
-                                        {
-                                            self.mouse_function = MouseFunction::Normal;
-                                            super_data.toggle_all(style);
-                                        };
+                                        }
+
+                                        super_style_manager(
+                                            ui,
+                                            &mut self.mouse_function,
+                                            &mut super_data,
+                                            style,
+                                        );
+
+                                        if ui.button("-").clicked() {
+                                            super_data.remove_color(i);
+                                        }
                                     });
                                 }
                             });
@@ -663,6 +623,33 @@ fn default_menu_button<'a>(text: &'a str) -> egui::containers::menu::MenuButton<
     let button = egui::containers::menu::MenuButton::new(text);
     let config = egui::containers::menu::MenuConfig::new();
     button.config(config.close_behavior(PopupCloseBehavior::CloseOnClickOutside))
+}
+
+// Super puzzle style manager
+fn super_style_manager(
+    ui: &mut Ui,
+    mouse_function: &mut MouseFunction,
+    super_data: &mut SuperData,
+    style: SuperStyle,
+) {
+    ui.horizontal(|ui| {
+        ui.label(super_data.selected_string(style));
+        let selected = *mouse_function == MouseFunction::Super(style);
+        if ui.add(Button::new("Select").selected(selected)).clicked() {
+            if selected {
+                *mouse_function = MouseFunction::Normal;
+            } else {
+                *mouse_function = MouseFunction::Super(style);
+            }
+        };
+        if ui
+            .add(Button::new("All").selected(super_data.piece_style_all == Some(style)))
+            .clicked()
+        {
+            *mouse_function = MouseFunction::Normal;
+            super_data.toggle_all(style);
+        };
+    });
 }
 
 #[derive(Debug, Clone, Copy)]
