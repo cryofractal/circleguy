@@ -24,7 +24,7 @@ impl Puzzle {
             self.position
                 .pieces
                 .iter()
-                .all(|piece| piece.isometry.approx_eq(&Isometry::identity(), PRECISION))
+                .all(|piece| piece.attitude.approx_eq(&Isometry::identity(), PRECISION))
         } else {
             // TODO: do this
             false

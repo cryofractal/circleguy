@@ -92,7 +92,7 @@ impl Puzzle {
                 None => {
                     if cut {
                         // Cut the piece
-                        let circle = turn.turn.circle * piece.isometry.inverse();
+                        let circle = turn.turn.circle * piece.attitude.inverse();
                         let (shape_in, shape_out) = piece
                             .piece
                             .shape
@@ -107,7 +107,7 @@ impl Puzzle {
                                 color: piece.piece.color,
                             }
                             .triangulate(DETAIL);
-                            piece_in.isometry = piece.isometry * turn.turn.isometry();
+                            piece_in.attitude = piece.attitude * turn.turn.isometry();
                             new_pieces.push(piece_in);
                         }
 
@@ -117,7 +117,7 @@ impl Puzzle {
                                 color: piece.piece.color,
                             }
                             .triangulate(DETAIL);
-                            piece_out.isometry = piece.isometry;
+                            piece_out.attitude = piece.attitude;
                             cut_pieces.push(piece_out);
                         }
                     } else {
@@ -126,7 +126,7 @@ impl Puzzle {
                 }
                 Some(Contains::Inside | Contains::Border) => {
                     let mut piece = piece.clone();
-                    piece.isometry.right_mul_mut(turn.turn.isometry());
+                    piece.attitude.right_mul_mut(turn.turn.isometry());
                     new_pieces.push(piece);
                 }
                 Some(Contains::Outside) => {

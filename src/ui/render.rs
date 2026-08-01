@@ -184,7 +184,7 @@ impl Puzzle {
         let isometry = if solved {
             Isometry::identity()
         } else {
-            piece.isometry
+            piece.attitude
                 * if let Some(offset) = self.position.animation_offset
                     && piece.in_circle(offset.circle)
                         == Some(crate::complex::complex_circle::Contains::Inside)

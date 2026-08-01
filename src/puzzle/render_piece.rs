@@ -40,7 +40,7 @@ pub type TriangulatedArc = Vec<Point>;
 pub struct RenderPiece {
     pub piece: Piece,
     pub triangulations: Vec<Triangulation>,
-    pub isometry: Isometry, // The isometry that maps the solved position to the current position.
+    pub attitude: Isometry, // The isometry that maps the solved position to the current position.
 }
 
 ///make triangles from the border points, given a center
@@ -165,7 +165,7 @@ impl Piece {
                 .map(|x| x.triangulate_component(detail))
                 .collect(),
             piece: self,
-            isometry: Isometry::identity(),
+            attitude: Isometry::identity(),
         }
     }
 }
@@ -190,12 +190,12 @@ pub fn rot_triangulations(tri: Vec<Triangulation>, turn: Turn) -> Vec<Triangulat
 
 impl RenderPiece {
     pub fn in_circle(&self, circle: ComplexCircle) -> Option<Contains> {
-        self.piece.in_circle(circle * self.isometry.inverse())
+        self.piece.in_circle(circle * self.attitude.inverse())
     }
 
-    /// Whether the piece contains the point, taking isometry into account.
+    /// Whether the piece contains the point, taking attitude into account.
     pub fn contains(&self, point: Point) -> Contains {
-        self.piece.shape.contains(point * self.isometry.inverse())
+        self.piece.shape.contains(point * self.attitude.inverse())
     }
 
     /// Estimate the barycenter by averaging the midpoints of all the arcs. It may not be in the piece!

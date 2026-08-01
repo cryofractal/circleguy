@@ -18,20 +18,20 @@ impl Puzzle {
                 self.intern.intern_in_place(&mut circle.circ.r_sq);
             }
 
-            self.intern.intern_in_place(&mut piece.isometry.a.re);
-            self.intern.intern_in_place(&mut piece.isometry.a.im);
-            self.intern.intern_in_place(&mut piece.isometry.b.re);
-            self.intern.intern_in_place(&mut piece.isometry.b.im);
+            self.intern.intern_in_place(&mut piece.attitude.a.re);
+            self.intern.intern_in_place(&mut piece.attitude.a.im);
+            self.intern.intern_in_place(&mut piece.attitude.b.re);
+            self.intern.intern_in_place(&mut piece.attitude.b.im);
         }
     }
 
     ///intern all the relevant floats in the puzzle into the float pool
     pub fn intern_isometries(&mut self) {
         for piece in &mut self.position.pieces {
-            self.intern.intern_in_place(&mut piece.isometry.a.re);
-            self.intern.intern_in_place(&mut piece.isometry.a.im);
-            self.intern.intern_in_place(&mut piece.isometry.b.re);
-            self.intern.intern_in_place(&mut piece.isometry.b.im);
+            self.intern.intern_in_place(&mut piece.attitude.a.re);
+            self.intern.intern_in_place(&mut piece.attitude.a.im);
+            self.intern.intern_in_place(&mut piece.attitude.b.re);
+            self.intern.intern_in_place(&mut piece.attitude.b.im);
         }
     }
 }
