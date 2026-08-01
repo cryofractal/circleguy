@@ -16,8 +16,8 @@ impl Isometry {
     /// Identity isometry.
     pub fn identity() -> Self {
         Self {
-            a: C64 { re: 1.0, im: 0.0 },
-            b: C64 { re: 0.0, im: 0.0 },
+            a: C64::one(),
+            b: C64::zero(),
         }
     }
 
@@ -40,7 +40,7 @@ impl Isometry {
         // z' = (z - cent) * phi + cent = phi * z + cent (1 - phi)
         Self {
             a: phi.0,
-            b: cent.0 * (C64 { re: 1.0, im: 0.0 } - phi.0),
+            b: cent.0 * (C64::one() - phi.0),
         }
     }
 
