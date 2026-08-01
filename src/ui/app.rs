@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use crate::complex::point::Point;
 use crate::hps::data_storer::data_storer::DataStorer;
 use crate::puzzle::puzzle::*;
-use crate::puzzle::super_data::{SuperData, SuperStyle};
+use crate::puzzle::super_data::{Annotation, SuperData, SuperStyle};
 use crate::ui::render::{CoordinateConverter, OutlineStyle, draw_circle};
 use crate::{DEF_PATH, DEFAULT_PUZZLE};
 use egui::*;
@@ -101,6 +101,7 @@ impl App {
 pub enum MouseFunction {
     Normal,
     Super(SuperStyle),
+    Annotation(Annotation),
 }
 
 impl eframe::App for App {
@@ -154,6 +155,11 @@ impl eframe::App for App {
                         }
                     }
                 }
+
+                // Render annotations
+                if let Err(x) = puzzle.render_annotations(ui, cc, self.preview) {
+                    self.curr_msg = x;
+                };
             }
 
             // Manage puzzle animation
@@ -409,6 +415,18 @@ impl eframe::App for App {
                                     });
                                 }
                             });
+
+                            ui.separator();
+
+                            ui.label("Arrows");
+                            ui.indent("Arrows", |ui| {
+                                annotation_manager(
+                                    ui,
+                                    &mut self.mouse_function,
+                                    &mut super_data,
+                                    Annotation::Arrow,
+                                );
+                            });
                         });
                 }
             }
@@ -604,6 +622,41 @@ impl App {
                     MouseInteractionType::Scroll(_) => {}
                 }
             }
+            MouseFunction::Annotation(annotation) => {
+                let hovered_piece = puzzle.piece_at_point(mouse.position, self.preview);
+                let super_data = puzzle.super_data.as_mut()?;
+
+                match mouse.typ {
+                    MouseInteractionType::Click => {
+                        if let Some(hovered_piece) = hovered_piece {
+                            super_data.toggle_annotation(hovered_piece, annotation);
+                        }
+                    }
+                    MouseInteractionType::SecondaryClick => {}
+                    MouseInteractionType::Hover => {
+                        self.hovered_piece = puzzle.piece_at_point(mouse.position, self.preview);
+                    }
+                    MouseInteractionType::DragOver => {
+                        if let Some(hovered_piece) = hovered_piece {
+                            match self.inserting_on_drag {
+                                Some(insert) => {
+                                    super_data.toggle_annotation_to(
+                                        hovered_piece,
+                                        annotation,
+                                        insert,
+                                    );
+                                }
+                                None => {
+                                    self.inserting_on_drag = Some(
+                                        super_data.toggle_annotation(hovered_piece, annotation),
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    MouseInteractionType::Scroll(_) => {}
+                }
+            }
         }
 
         if !matches!(mouse.typ, MouseInteractionType::DragOver) {
@@ -630,7 +683,7 @@ fn super_style_manager(
     style: SuperStyle,
 ) {
     ui.horizontal(|ui| {
-        ui.label(super_data.selected_string(style));
+        ui.label(super_data.style_selected_string(style));
         let selected = *mouse_function == MouseFunction::Super(style);
         if ui.add(Button::new("Select").selected(selected)).clicked() {
             if selected {
@@ -645,6 +698,33 @@ fn super_style_manager(
         {
             *mouse_function = MouseFunction::Normal;
             super_data.toggle_style_all(style);
+        };
+    });
+}
+
+// Super puzzle annotation manager
+fn annotation_manager(
+    ui: &mut Ui,
+    mouse_function: &mut MouseFunction,
+    super_data: &mut SuperData,
+    annotation: Annotation,
+) {
+    ui.horizontal(|ui| {
+        ui.label(super_data.annotation_selected_string(annotation));
+        let selected = *mouse_function == MouseFunction::Annotation(annotation);
+        if ui.add(Button::new("Select").selected(selected)).clicked() {
+            if selected {
+                *mouse_function = MouseFunction::Normal;
+            } else {
+                *mouse_function = MouseFunction::Annotation(annotation);
+            }
+        };
+        if ui
+            .add(Button::new("All").selected(super_data.piece_annotation_all == Some(annotation)))
+            .clicked()
+        {
+            *mouse_function = MouseFunction::Normal;
+            super_data.toggle_annotation_all(annotation);
         };
     });
 }

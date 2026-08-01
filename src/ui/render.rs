@@ -16,6 +16,7 @@ use crate::puzzle::color::rainbow_rational;
 use crate::puzzle::piece::Piece;
 use crate::puzzle::puzzle::*;
 use crate::puzzle::render_piece::Triangulation;
+use crate::puzzle::super_data::Annotation;
 use crate::puzzle::super_data::SuperStyle;
 use approx_collections::ApproxEq;
 use core::f64;
@@ -33,6 +34,8 @@ use std::ffi::OsString;
 
 const STARBURST_SIZE: usize = 20;
 const STARBURST_CUT_RADIUS: f64 = 1000.0;
+const ARROW_LENGTH: f32 = 5.0;
+const ARROW_COLOR: egui::Color32 = Color32::BLACK;
 
 pub struct RenderingCircle {
     pub cent: Pos2,
@@ -289,6 +292,72 @@ impl Puzzle {
 
         Ok(())
     }
+
+    pub fn render_piece_annotation(
+        &self,
+        index: usize,
+        ui: &mut Ui,
+        cc: CoordinateConverter,
+        solved: bool,
+    ) -> Result<(), String> {
+        let Some(piece) = self.position.pieces.get(index) else {
+            return Ok(());
+        };
+
+        let isometry = if solved {
+            Isometry::identity()
+        } else {
+            piece.attitude
+                * if let Some(offset) = self.position.animation_offset
+                    && piece.in_circle(offset.circle)
+                        == Some(crate::complex::complex_circle::Contains::Inside)
+                {
+                    //get the offset of the piece, base on if its in the animation_offset circle
+                    offset.mult(self.position.anim_left as f64).isometry()
+                } else {
+                    Isometry::identity()
+                }
+        };
+
+        let Some(super_data) = self.super_data.as_ref() else {
+            return Ok(());
+        };
+
+        let Some(annotation) = super_data.get_annotation(index) else {
+            return Ok(());
+        };
+
+        match annotation {
+            Annotation::Arrow => {
+                let angle = isometry.rotation_angle();
+                let barycenter = piece.barycenter() * isometry;
+                let mut mesh = epaint::Mesh::default(); //make a new mesh
+                mesh.indices = vec![0, 1, 2, 0, 2, 3];
+                let zeta = C64::from_angle(PI * 0.4);
+                mesh.vertices = vec![
+                    zeta.conj(),
+                    C64::one(),
+                    zeta,
+                    ((zeta * zeta).re * 2.0 - 1.0) * C64::one(),
+                ]
+                .into_iter()
+                .map(|z| z * C64::from_angle(angle))
+                .map(|z| epaint::Vertex {
+                    pos: barycenter.to_pos2(cc)
+                        + Vec2 {
+                            x: z.im as f32,
+                            y: z.re as f32,
+                        } * ARROW_LENGTH,
+                    uv: pos2(0.0, 0.0),
+                    color: ARROW_COLOR,
+                })
+                .collect(); //add all the vertices
+                ui.painter().add(egui::Shape::Mesh(mesh.into())); //paint the triangles
+            }
+        }
+
+        Ok(())
+    }
 }
 
 impl Puzzle {
@@ -303,6 +372,20 @@ impl Puzzle {
         for i in 0..self.position.pieces.len() {
             //render each piece
             self.render_piece(i, ui, cc, outline_width, OutlineStyle::Filled, solved)?;
+        }
+        Ok(())
+    }
+
+    /// Render only puzzle annotations
+    pub fn render_annotations(
+        &self,
+        ui: &mut Ui,
+        cc: CoordinateConverter,
+        solved: bool,
+    ) -> Result<(), String> {
+        for i in 0..self.position.pieces.len() {
+            //render each piece
+            self.render_piece_annotation(i, ui, cc, solved)?;
         }
         Ok(())
     }

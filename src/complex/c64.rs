@@ -74,6 +74,14 @@ impl ApproxEq for C64 {
 }
 
 impl C64 {
+    pub fn zero() -> Self {
+        Self { re: 0.0, im: 0.0 }
+    }
+
+    pub fn one() -> Self {
+        Self { re: 1.0, im: 0.0 }
+    }
+
     ///magnitude squared
     pub fn mag_sq(&self) -> Scalar {
         (self.im * self.im) + (self.re * self.re)
