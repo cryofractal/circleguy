@@ -6,7 +6,7 @@ use crate::puzzle::color::rainbow_float;
 /// Data on color scheme for super puzzles
 #[derive(Debug, Clone)]
 pub struct SuperData {
-    pub piece_styles: HashMap<usize, SuperStyle>,
+    piece_styles: HashMap<usize, SuperStyle>,
     pub piece_style_all: Option<SuperStyle>,
     pub starburst_center: usize,
     pub solid_colors: Vec<Color32>,
@@ -27,6 +27,17 @@ impl SuperData {
             starburst_center: 0,
             solid_colors: Vec::new(),
         }
+    }
+
+    pub fn set_style(&mut self, index: usize, style: SuperStyle) {
+        if style == SuperStyle::Starburst && self.styled_count(style) == 0 {
+            self.starburst_center = index;
+        }
+        self.piece_styles.insert(index, style);
+    }
+
+    pub fn remove_style(&mut self, index: usize) {
+        self.piece_styles.remove(&index);
     }
 
     /// Split the piece at index `index` into itself and another piece at index `new_index`.
@@ -58,19 +69,19 @@ impl SuperData {
 
     pub fn toggle(&mut self, index: usize, style: SuperStyle) -> bool {
         if self.piece_styles.get(&index) == Some(&style) {
-            self.piece_styles.remove(&index);
+            self.remove_style(index);
             false
         } else {
-            self.piece_styles.insert(index, style);
+            self.set_style(index, style);
             true
         }
     }
 
     pub fn toggle_to(&mut self, index: usize, style: SuperStyle, insert: bool) {
         if insert {
-            self.piece_styles.insert(index, style);
+            self.set_style(index, style);
         } else if self.piece_styles.get(&index) == Some(&style) {
-            self.piece_styles.remove(&index);
+            self.remove_style(index);
         }
     }
 

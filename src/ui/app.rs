@@ -575,14 +575,11 @@ impl App {
                 match mouse.typ {
                     MouseInteractionType::Click => {
                         if let Some(hovered_piece) = hovered_piece {
-                            if super_data.styled_count(style) == 0 {
-                                super_data.starburst_center = hovered_piece;
-                            }
                             super_data.toggle(hovered_piece, style);
                         }
                     }
                     MouseInteractionType::SecondaryClick => {
-                        if matches!(style, SuperStyle::Starburst)
+                        if style == SuperStyle::Starburst
                             && let Some(hovered_piece) = hovered_piece
                         {
                             super_data.starburst_center = hovered_piece;
