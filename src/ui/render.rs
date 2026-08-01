@@ -205,8 +205,10 @@ impl Puzzle {
                     Some(SuperStyle::OrientationColor) => {
                         let angle = isometry.rotation_angle();
                         // angle is in [-π, π]
-                        let color = if angle.approx_eq(&0.0, PRECISION) {
+                        let color = if isometry.approx_eq(&Isometry::identity(), PRECISION) {
                             Color::White.to_egui()
+                        } else if angle.approx_eq(&0.0, PRECISION) {
+                            Color::Gray.to_egui()
                         } else {
                             rainbow_float(angle / (2.0 * PI))
                         };
