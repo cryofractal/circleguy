@@ -73,6 +73,12 @@ impl SuperData {
 
     pub fn toggle_style_all(&mut self, style: SuperStyle) {
         if self.piece_style_all == Some(style) {
+            self.piece_styles = self
+                .piece_styles
+                .clone()
+                .into_iter()
+                .filter(|(_p, st)| *st != style)
+                .collect();
             self.piece_style_all = None;
         } else {
             self.piece_style_all = Some(style);
@@ -129,6 +135,12 @@ impl SuperData {
 
     pub fn toggle_annotation_all(&mut self, annotation: Annotation) {
         if self.piece_annotation_all == Some(annotation) {
+            self.piece_annotations = self
+                .piece_annotations
+                .clone()
+                .into_iter()
+                .filter(|(_p, a)| *a != annotation)
+                .collect();
             self.piece_annotation_all = None;
         } else {
             self.piece_annotation_all = Some(annotation);
