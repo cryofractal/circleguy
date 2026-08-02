@@ -1,12 +1,14 @@
 use crate::DEF_PATH;
 use crate::DETAIL;
 use crate::PRECISION;
+use crate::complex::arc::Arc;
 use crate::complex::c64::C64;
 use crate::complex::complex_circle::Circle;
 use crate::complex::complex_circle::Contains;
 use crate::complex::complex_circle::OrientedCircle;
 use crate::complex::isometry::Isometry;
 use crate::complex::point::Point;
+use crate::complex::vector::Vector;
 use crate::hps::data_storer::data_storer::DataStorer;
 use crate::hps::data_storer::data_storer::PuzzleLoadingData;
 use crate::hps::data_storer::def_entry::DefEntry;
@@ -19,6 +21,7 @@ use crate::puzzle::render_piece::Triangulation;
 use crate::puzzle::super_data::Annotation;
 use crate::puzzle::super_data::SuperStyle;
 use approx_collections::ApproxEq;
+use approx_collections::FloatPool;
 use core::f64;
 use egui::FontId;
 use egui::Popup;
@@ -29,8 +32,12 @@ use egui::{
     pos2,
 };
 use std::cmp::*;
+use std::collections::BinaryHeap;
+use std::collections::HashMap;
 use std::f64::consts::PI;
 use std::ffi::OsString;
+use std::hash::Hash;
+use std::hash::Hasher;
 
 const STARBURST_SIZE: usize = 20;
 const STARBURST_CUT_RADIUS: f64 = 1000.0;
@@ -135,24 +142,30 @@ impl Triangulation {
 #[derive(Debug, Clone, Copy)]
 pub enum OutlineStyle {
     Normal,
+    Taped,
     Hovered,
     HoveredSecondary,
+    Debug,
 }
 
 impl OutlineStyle {
     pub fn width(self) -> f32 {
         match self {
             OutlineStyle::Normal => 1.0,
+            OutlineStyle::Taped => 0.5,
             OutlineStyle::Hovered => 2.0,
             OutlineStyle::HoveredSecondary => 1.5,
+            OutlineStyle::Debug => 3.0,
         }
     }
 
     pub fn color(self) -> Color32 {
         match self {
             OutlineStyle::Normal => Color32::BLACK,
+            OutlineStyle::Taped => Color32::BLACK,
             OutlineStyle::Hovered => Color32::from_rgb(210, 210, 210),
             OutlineStyle::HoveredSecondary => Color32::from_rgb(168, 168, 168),
+            OutlineStyle::Debug => Color32::MAGENTA,
         }
     }
 }
@@ -396,8 +409,70 @@ impl Puzzle {
         for i in 0..self.position.pieces.len() {
             //render each piece
             self.render_piece(i, ui, cc, solved)?;
-            self.render_piece_outline(i, ui, cc, outline_width, OutlineStyle::Normal, solved)?;
+
+            let outline_style = if self
+                .control_data
+                .tape_groups
+                .iter()
+                .any(|tape_group| tape_group.contains(&i))
+            {
+                OutlineStyle::Taped
+            } else {
+                OutlineStyle::Normal
+            };
+
+            self.render_piece_outline(i, ui, cc, outline_width, outline_style, solved)?;
         }
+
+        for tape_group in &self.control_data.tape_groups {
+            let mut arc_endpoints = HashMap::new(); // circles as keys is sound because of interning
+            let outline_style = OutlineStyle::Normal;
+
+            for i in tape_group {
+                let Some(piece) = self.position.pieces.get(*i) else {
+                    continue;
+                };
+
+                let isometry = if solved {
+                    Isometry::identity()
+                } else {
+                    piece.attitude
+                        * if let Some(offset) = self.position.animation_offset
+                            && piece.in_circle(offset.circle)
+                                == Some(crate::complex::complex_circle::Contains::Inside)
+                        {
+                            //get the offset of the piece, base on if its in the animation_offset circle
+                            offset.mult(self.position.anim_left as f64).isometry()
+                        } else {
+                            Isometry::identity()
+                        }
+                };
+
+                for arc in &piece.piece.shape.border {
+                    arc_endpoints
+                        .entry((
+                            FloatOrd(arc.circle.center.0.re),
+                            FloatOrd(arc.circle.center.0.im),
+                            FloatOrd(arc.circle.r_sq),
+                        ))
+                        .or_insert(ArcEndpoints::new())
+                        .add_arc(*arc * isometry);
+                }
+            }
+
+            for ae in arc_endpoints.into_values() {
+                for arc in ae.read_arcs() {
+                    ui.painter().add(PathShape::line(
+                        arc.get_polygon(DETAIL)
+                            .iter()
+                            .map(|p| p.to_pos2(cc))
+                            .collect(),
+                        Stroke::new(outline_width * outline_style.width(), outline_style.color()),
+                    ));
+                }
+            }
+        }
+
         Ok(())
     }
 
@@ -523,5 +598,114 @@ impl DataStorer {
             })
             .inner
             .or(Err(()))?)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
+struct FloatOrd(f64);
+
+impl Eq for FloatOrd {}
+
+impl Ord for FloatOrd {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.0.total_cmp(&other.0)
+    }
+}
+
+impl Hash for FloatOrd {
+    fn hash<H>(&self, h: &mut H)
+    where
+        H: Hasher,
+    {
+        h.write_u64(self.0.to_bits());
+    }
+}
+
+struct ArcEndpoints {
+    circle: Circle,
+    intern: FloatPool,
+    endpoints: BinaryHeap<FloatOrd>, // [-π, π]
+}
+
+impl ArcEndpoints {
+    fn new() -> Self {
+        Self {
+            circle: Circle {
+                center: Point(C64::zero()),
+                r_sq: 0.0,
+            }, // dummy circle
+            intern: FloatPool::new(PRECISION),
+            endpoints: BinaryHeap::new(),
+        }
+    }
+
+    fn add_arc(&mut self, arc: Arc) {
+        self.circle = arc.circle;
+
+        let mut start = (arc.start - arc.circle.center).angle(); // [-π, π]
+        let mut end = start + arc.angle;
+        if arc.angle > 0.0 {
+            std::mem::swap(&mut start, &mut end);
+        }
+
+        loop {
+            let midpoint = (start + end) / 2.0;
+            if midpoint < -PI - 1e-8 {
+                start += 2.0 * PI;
+                end += 2.0 * PI;
+                continue;
+            }
+            if midpoint > PI + 1e-8 {
+                start -= 2.0 * PI;
+                end -= 2.0 * PI;
+                continue;
+            }
+            break;
+        }
+
+        if start < -PI {
+            self.add_endpoint(start + 2.0 * PI);
+            self.add_endpoint(PI);
+        } else {
+            self.add_endpoint(start);
+        }
+
+        if end > PI {
+            self.add_endpoint(end - 2.0 * PI);
+            self.add_endpoint(-PI);
+        } else {
+            self.add_endpoint(end);
+        }
+    }
+
+    fn add_endpoint(&mut self, endpoint: f64) {
+        let endpoint = self.intern.intern(endpoint);
+        self.endpoints.push(FloatOrd(endpoint));
+    }
+
+    fn read_arcs(self) -> Vec<Arc> {
+        // A better language would make doing this without allocation easy
+        let endpoints = self.endpoints.into_sorted_vec();
+
+        let mut dedup = Vec::new();
+        for endpoint in endpoints {
+            if dedup.first().is_some_and(|ep| *ep == endpoint) {
+                dedup.pop();
+            } else {
+                dedup.push(endpoint);
+            }
+        }
+
+        dedup
+            .as_chunks()
+            .0
+            .into_iter()
+            .map(|[FloatOrd(start), FloatOrd(end)]| Arc {
+                circle: self.circle,
+                angle: end - start,
+                start: self.circle.center
+                    + self.circle.r_sq.sqrt() * Vector(C64::from_angle(*start)),
+            })
+            .collect()
     }
 }

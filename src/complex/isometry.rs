@@ -1,4 +1,4 @@
-use crate::complex::{c64::Scalar, complex_circle::Circle, rotation::Rotation};
+use crate::complex::{arc::Arc, c64::Scalar, complex_circle::Circle, rotation::Rotation};
 use std::ops::Mul;
 
 use approx_collections::ApproxEq;
@@ -97,6 +97,17 @@ impl Mul<Isometry> for Circle {
         Circle {
             center: self.center * rhs,
             r_sq: self.r_sq,
+        }
+    }
+}
+
+impl Mul<Isometry> for Arc {
+    type Output = Arc;
+    fn mul(self, rhs: Isometry) -> Self::Output {
+        Arc {
+            circle: self.circle * rhs,
+            start: self.start * rhs,
+            angle: self.angle,
         }
     }
 }
