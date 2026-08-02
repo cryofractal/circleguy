@@ -3,6 +3,7 @@ use crate::PRECISION;
 use crate::complex::complex_circle::Contains;
 use crate::complex::point::Point;
 use crate::hps::data_storer::data_storer::PuzzleData;
+use crate::puzzle::control_data::ControlData;
 use crate::puzzle::piece::Piece;
 use crate::puzzle::render_piece::RenderPiece;
 use crate::puzzle::super_data::SuperData;
@@ -13,6 +14,7 @@ use rand::SeedableRng;
 use rand::prelude::IteratorRandom;
 use std::cmp::Ordering;
 use std::collections::HashMap;
+use std::collections::HashSet;
 use std::hash::DefaultHasher;
 use std::hash::Hash;
 use std::hash::Hasher;
@@ -27,6 +29,7 @@ pub struct Puzzle {
     pub depth: usize,
     pub keybinds: HashMap<egui::Key, (String, isize)>,
     pub solved_pieces: Vec<RenderPiece>, // This is only used for resetting the puzzle
+    pub control_data: ControlData,
     pub super_data: Option<SuperData>,
     pub position: PuzzlePosition,
 }
@@ -71,6 +74,7 @@ impl Puzzle {
             keybinds: data.keybinds,
             path: data.path,
             solved_pieces: pieces.clone(),
+            control_data: ControlData::new(),
             super_data: is_super.then_some(SuperData::new()),
             position: PuzzlePosition::new(pieces),
         }
@@ -79,14 +83,19 @@ impl Puzzle {
     pub fn check(&mut self) {
         self.position.solved = self.is_solved();
     }
-    ///turns the puzzle around a turn. cuts along the turn first if cut is true.
-    ///if the turn was completed, returns Ok(true)
-    ///if the turn was bandaged (and cut was false), returns Ok(false)
-    ///if an error was encountered, returns Err(e) where e was the error
-    pub fn turn(&mut self, turn: OrderedTurn, cut: bool) -> Result<bool, String> {
+
+    /// Returns Ok(Some(pieces)) if it succeeded, Ok(None) if it didn't, Err(message) if error
+    fn turn_new_piece(
+        &mut self,
+        turn: OrderedTurn,
+        cut: bool,
+    ) -> Result<Option<(Vec<RenderPiece>, Vec<(usize, usize)>)>, String> {
         let mut new_pieces = Vec::new();
         let mut cut_pieces = Vec::new(); // Pieces that go on the end of the list
         let mut split_indices = Vec::new();
+
+        let mut pieces_turned = HashSet::new();
+        let mut pieces_not_turned = HashSet::new();
         for (i, piece) in self.position.pieces.iter().enumerate() {
             match piece.in_circle(turn.turn.circle) {
                 None => {
@@ -120,21 +129,48 @@ impl Puzzle {
                             piece_out.attitude = piece.attitude;
                             cut_pieces.push(piece_out);
                         }
+
+                        pieces_turned.insert(i);
+                        pieces_not_turned.insert(i);
                     } else {
-                        return Ok(false);
+                        return Ok(None);
                     }
                 }
                 Some(Contains::Inside | Contains::Border) => {
                     let mut piece = piece.clone();
                     piece.attitude.right_mul_mut(turn.turn.isometry());
                     new_pieces.push(piece);
+                    pieces_turned.insert(i);
                 }
                 Some(Contains::Outside) => {
                     new_pieces.push(piece.clone());
+                    pieces_not_turned.insert(i);
                 }
             }
         }
+
+        for (ti, tape_group) in self.control_data.tape_groups.iter().enumerate() {
+            if tape_group.iter().any(|t| pieces_turned.contains(t))
+                && tape_group.iter().any(|t| pieces_not_turned.contains(t))
+            {
+                return Err(format!("Blocked by tape group {ti}"));
+            }
+        }
+
         new_pieces.extend(cut_pieces);
+
+        Ok(Some((new_pieces, split_indices)))
+    }
+
+    ///turns the puzzle around a turn. cuts along the turn first if cut is true.
+    ///if the turn was completed, returns Ok(true)
+    ///if the turn was bandaged (and cut was false), returns Ok(false)
+    ///if an error was encountered, returns Err(e) where e was the error
+    pub fn turn(&mut self, turn: OrderedTurn, cut: bool) -> Result<bool, String> {
+        let Some((new_pieces, split_indices)) = self.turn_new_piece(turn, cut)? else {
+            return Ok(false);
+        };
+
         self.position.pieces = new_pieces;
 
         self.position.anim_left = 1.0; //set the animation to run

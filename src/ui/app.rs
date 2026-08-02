@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::ffi::OsString;
 use std::path::PathBuf;
 
@@ -100,6 +101,7 @@ impl App {
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum MouseFunction {
     Normal,
+    TapeGroup(usize),
     Super(SuperStyle),
     Annotation(Annotation),
 }
@@ -345,10 +347,42 @@ impl eframe::App for App {
                 Window::new("Puzzle Info")
                     .default_pos((10.0, 40.0))
                     .auto_sized()
+                    .max_width(250.0)
                     .show(ctx, |ui| {
                         ui.label(String::from("Name: ") + &p.name);
                         ui.label(String::from("Authors: ") + &p.authors.join(", "));
                         ui.label(p.position.pieces.len().to_string() + " pieces");
+
+                        ui.separator();
+
+                        ui.horizontal(|ui| {
+                            ui.label("Tape groups");
+                            if ui.button("+").clicked() {
+                                p.control_data.tape_groups.push(HashSet::new());
+                            }
+                        });
+                        ui.indent("Tape groups", |ui| {
+                            for (i, tape_group) in
+                                p.control_data.tape_groups.clone().into_iter().enumerate()
+                            {
+                                ui.horizontal(|ui| {
+                                    ui.label(format!("{} selected", tape_group.len()));
+                                    let selected =
+                                        self.mouse_function == MouseFunction::TapeGroup(i);
+                                    if ui.add(Button::new("Select").selected(selected)).clicked() {
+                                        if selected {
+                                            self.mouse_function = MouseFunction::Normal;
+                                        } else {
+                                            self.mouse_function = MouseFunction::TapeGroup(i);
+                                        }
+                                    };
+
+                                    if ui.button("-").clicked() {
+                                        p.control_data.tape_groups.remove(i);
+                                    };
+                                });
+                            }
+                        });
                     });
 
                 if let Some(mut super_data) = p.super_data.as_mut() {
@@ -373,14 +407,12 @@ impl eframe::App for App {
 
                             ui.label("Starburst");
                             ui.indent("Starburst", |ui| {
-                                ui.horizontal(|ui| {
-                                    super_style_manager(
-                                        ui,
-                                        &mut self.mouse_function,
-                                        &mut super_data,
-                                        SuperStyle::Starburst,
-                                    );
-                                })
+                                super_style_manager(
+                                    ui,
+                                    &mut self.mouse_function,
+                                    &mut super_data,
+                                    SuperStyle::Starburst,
+                                );
                             });
 
                             ui.horizontal(|ui| {
@@ -586,6 +618,43 @@ impl App {
                     }
                 }
             },
+            MouseFunction::TapeGroup(i) => {
+                let hovered_piece = puzzle.piece_at_point(mouse.position, self.preview);
+
+                if !self.preview || puzzle.super_data.is_some() {
+                    match mouse.typ {
+                        MouseInteractionType::Click => {
+                            if let Some(hovered_piece) = hovered_piece {
+                                puzzle.control_data.toggle_tape_group(i, hovered_piece);
+                            }
+                        }
+                        MouseInteractionType::SecondaryClick => {}
+                        MouseInteractionType::Hover => {
+                            self.hovered_piece =
+                                puzzle.piece_at_point(mouse.position, self.preview);
+                        }
+                        MouseInteractionType::DragOver => {
+                            if let Some(hovered_piece) = hovered_piece {
+                                match self.inserting_on_drag {
+                                    Some(insert) => {
+                                        puzzle.control_data.toggle_tape_group_to(
+                                            i,
+                                            hovered_piece,
+                                            insert,
+                                        );
+                                    }
+                                    None => {
+                                        self.inserting_on_drag = Some(
+                                            puzzle.control_data.toggle_tape_group(i, hovered_piece),
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                        MouseInteractionType::Scroll(_) => {}
+                    }
+                }
+            }
             MouseFunction::Super(style) => {
                 let hovered_piece = puzzle.piece_at_point(mouse.position, self.preview);
                 let super_data = puzzle.super_data.as_mut()?;

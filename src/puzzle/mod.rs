@@ -1,4 +1,5 @@
 pub mod color;
+pub mod control_data;
 pub mod intern;
 pub mod piece;
 pub mod piece_shape;
