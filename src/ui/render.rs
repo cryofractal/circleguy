@@ -134,7 +134,6 @@ impl Triangulation {
 
 #[derive(Debug, Clone, Copy)]
 pub enum OutlineStyle {
-    Filled,
     Normal,
     Hovered,
     HoveredSecondary,
@@ -143,7 +142,6 @@ pub enum OutlineStyle {
 impl OutlineStyle {
     pub fn width(self) -> f32 {
         match self {
-            OutlineStyle::Filled => 1.0,
             OutlineStyle::Normal => 1.0,
             OutlineStyle::Hovered => 2.0,
             OutlineStyle::HoveredSecondary => 1.5,
@@ -152,7 +150,6 @@ impl OutlineStyle {
 
     pub fn color(self) -> Color32 {
         match self {
-            OutlineStyle::Filled => Color32::BLACK,
             OutlineStyle::Normal => Color32::BLACK,
             OutlineStyle::Hovered => Color32::from_rgb(210, 210, 210),
             OutlineStyle::HoveredSecondary => Color32::from_rgb(168, 168, 168),
@@ -176,8 +173,6 @@ impl Puzzle {
         index: usize,
         ui: &mut Ui,
         cc: CoordinateConverter,
-        outline_size: f32,
-        outline_style: OutlineStyle,
         solved: bool,
     ) -> Result<(), String> {
         let Some(piece) = self.position.pieces.get(index) else {
@@ -274,11 +269,40 @@ impl Puzzle {
         for (new_piece, color) in pieces {
             for triangle in &new_piece.triangulations {
                 //iterate over the triangles
-                if matches!(outline_style, OutlineStyle::Filled) {
-                    triangle.render_fill(ui, cc, isometry, color);
-                }
+                triangle.render_fill(ui, cc, isometry, color);
             }
         }
+
+        Ok(())
+    }
+
+    pub fn render_piece_outline(
+        &self,
+        index: usize,
+        ui: &mut Ui,
+        cc: CoordinateConverter,
+        outline_size: f32,
+        outline_style: OutlineStyle,
+        solved: bool,
+    ) -> Result<(), String> {
+        let Some(piece) = self.position.pieces.get(index) else {
+            return Ok(());
+        };
+
+        let isometry = if solved {
+            Isometry::identity()
+        } else {
+            piece.attitude
+                * if let Some(offset) = self.position.animation_offset
+                    && piece.in_circle(offset.circle)
+                        == Some(crate::complex::complex_circle::Contains::Inside)
+                {
+                    //get the offset of the piece, base on if its in the animation_offset circle
+                    offset.mult(self.position.anim_left as f64).isometry()
+                } else {
+                    Isometry::identity()
+                }
+        };
 
         for triangle in &piece.triangulations {
             triangle.render_outlines(
@@ -371,7 +395,8 @@ impl Puzzle {
     ) -> Result<(), String> {
         for i in 0..self.position.pieces.len() {
             //render each piece
-            self.render_piece(i, ui, cc, outline_width, OutlineStyle::Filled, solved)?;
+            self.render_piece(i, ui, cc, solved)?;
+            self.render_piece_outline(i, ui, cc, outline_width, OutlineStyle::Normal, solved)?;
         }
         Ok(())
     }

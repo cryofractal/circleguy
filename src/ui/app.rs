@@ -125,7 +125,7 @@ impl eframe::App for App {
 
                 // Render the hovered outline on top of the normal outline
                 if let Some(hovered_piece) = self.hovered_piece {
-                    if let Err(x) = puzzle.render_piece(
+                    if let Err(x) = puzzle.render_piece_outline(
                         hovered_piece,
                         ui,
                         cc,
@@ -141,7 +141,7 @@ impl eframe::App for App {
                     }
 
                     if puzzle.super_data.is_some() {
-                        if let Err(x) = puzzle.render_piece(
+                        if let Err(x) = puzzle.render_piece_outline(
                             hovered_piece,
                             ui,
                             cc,
