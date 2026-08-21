@@ -428,6 +428,7 @@ impl Puzzle {
         }
 
         for tape_set in &self.control_data.tape_sets {
+            let mut intern = FloatPool::new(PRECISION);
             let mut arc_endpoints = HashMap::new(); // circles as keys is sound because of interning
             let outline_style = OutlineStyle::NormalWithColor(tape_set.outline_color);
 
@@ -452,15 +453,15 @@ impl Puzzle {
                 };
 
                 for arc in &piece.piece.shape.border {
-                    let new_center = arc.circle.center * isometry;
+                    let new_arc = *arc * isometry;
                     arc_endpoints
                         .entry((
-                            FloatOrd(new_center.0.re),
-                            FloatOrd(new_center.0.im),
-                            FloatOrd(arc.circle.r_sq),
+                            FloatOrd(intern.intern(new_arc.circle.center.0.re)),
+                            FloatOrd(intern.intern(new_arc.circle.center.0.im)),
+                            FloatOrd(intern.intern(arc.circle.r_sq)),
                         ))
                         .or_insert(ArcEndpoints::new())
-                        .add_arc(*arc * isometry);
+                        .add_arc(new_arc, &mut intern);
                 }
             }
 
@@ -627,7 +628,6 @@ impl Hash for FloatOrd {
 
 struct ArcEndpoints {
     circle: Circle,
-    intern: FloatPool,
     endpoints: BinaryHeap<FloatOrd>, // [-π, π]
 }
 
@@ -638,17 +638,16 @@ impl ArcEndpoints {
                 center: Point(C64::zero()),
                 r_sq: 0.0,
             }, // dummy circle
-            intern: FloatPool::new(PRECISION),
             endpoints: BinaryHeap::new(),
         }
     }
 
-    fn add_arc(&mut self, arc: Arc) {
+    fn add_arc(&mut self, arc: Arc, intern: &mut FloatPool) {
         self.circle = arc.circle;
 
         let mut start = (arc.start - arc.circle.center).angle(); // [-π, π]
         let mut end = start + arc.angle;
-        if arc.angle > 0.0 {
+        if arc.angle < 0.0 {
             std::mem::swap(&mut start, &mut end);
         }
 
@@ -668,22 +667,24 @@ impl ArcEndpoints {
         }
 
         if start < -PI {
-            self.add_endpoint(start + 2.0 * PI);
-            self.add_endpoint(PI);
+            self.add_endpoint(start + 2.0 * PI, intern);
+            self.add_endpoint(PI, intern);
+            self.add_endpoint(-PI, intern);
         } else {
-            self.add_endpoint(start);
+            self.add_endpoint(start, intern);
         }
 
         if end > PI {
-            self.add_endpoint(end - 2.0 * PI);
-            self.add_endpoint(-PI);
+            self.add_endpoint(end - 2.0 * PI, intern);
+            self.add_endpoint(PI, intern);
+            self.add_endpoint(-PI, intern);
         } else {
-            self.add_endpoint(end);
+            self.add_endpoint(end, intern);
         }
     }
 
-    fn add_endpoint(&mut self, endpoint: f64) {
-        let endpoint = self.intern.intern(endpoint);
+    fn add_endpoint(&mut self, endpoint: f64, intern: &mut FloatPool) {
+        let endpoint = intern.intern(endpoint);
         self.endpoints.push(FloatOrd(endpoint));
     }
 
