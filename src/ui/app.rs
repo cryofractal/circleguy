@@ -100,7 +100,7 @@ impl App {
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum MouseFunction {
     Normal,
-    TapeGroup(usize),
+    TapeSet(usize),
     Super(SuperStyle),
     Annotation(Annotation),
 }
@@ -292,17 +292,20 @@ impl eframe::App for App {
                     {
                         // If this is not present, information may be able to leak about piece identity through scrambling in non-super puzzles
                         self.hovered_piece = None;
+                        self.mouse_function = MouseFunction::Normal;
 
                         let _ = p.scramble(self.cut_on_turn);
                     }
                     //reset button
-                    if ui.add(egui::Button::new("Reset")).clicked()
-                        && !self.preview
-                        && let Some(ref mut p) = self.puzzle
-                        && p.reset().is_err()
-                    {
-                        self.curr_msg = String::from("Reset failed!")
-                    };
+                    if ui.add(egui::Button::new("Reset")).clicked() {
+                        self.mouse_function = MouseFunction::Normal;
+                        if !self.preview
+                            && let Some(ref mut p) = self.puzzle
+                            && p.reset().is_err()
+                        {
+                            self.curr_msg = String::from("Reset failed!")
+                        };
+                    }
                 });
                 //puzzle menu controls puzzle operations
                 let puzzle_button = default_menu_button("Puzzle");
@@ -375,18 +378,24 @@ impl eframe::App for App {
                                     }
 
                                     ui.label(format!("{} selected", tape_set.pieces.len()));
-                                    let selected =
-                                        self.mouse_function == MouseFunction::TapeGroup(i);
+                                    let selected = self.mouse_function == MouseFunction::TapeSet(i);
                                     if ui.add(Button::new("Select").selected(selected)).clicked() {
                                         if selected {
                                             self.mouse_function = MouseFunction::Normal;
                                         } else {
-                                            self.mouse_function = MouseFunction::TapeGroup(i);
+                                            self.mouse_function = MouseFunction::TapeSet(i);
                                         }
                                     };
 
                                     if ui.button("-").clicked() {
                                         p.control_data.tape_sets.remove(i);
+                                        if let MouseFunction::TapeSet(t) = self.mouse_function {
+                                            if t == i {
+                                                self.mouse_function = MouseFunction::Normal;
+                                            } else if t > i {
+                                                self.mouse_function = MouseFunction::TapeSet(t - 1);
+                                            }
+                                        }
                                     };
                                 });
                             }
@@ -447,6 +456,17 @@ impl eframe::App for App {
 
                                         if ui.button("-").clicked() {
                                             super_data.remove_color(i);
+                                            if let MouseFunction::Super(SuperStyle::SolidColor(c)) =
+                                                self.mouse_function
+                                            {
+                                                if c == i {
+                                                    self.mouse_function = MouseFunction::Normal;
+                                                } else if c > i {
+                                                    self.mouse_function = MouseFunction::Super(
+                                                        SuperStyle::SolidColor(c - 1),
+                                                    );
+                                                }
+                                            }
                                         }
                                     });
                                 }
@@ -622,7 +642,7 @@ impl App {
                     }
                 }
             },
-            MouseFunction::TapeGroup(i) => {
+            MouseFunction::TapeSet(i) => {
                 let hovered_piece = puzzle.piece_at_point(mouse.position, self.preview);
 
                 if !self.preview || puzzle.super_data.is_some() {
