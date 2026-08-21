@@ -1,4 +1,3 @@
-use std::collections::HashSet;
 use std::ffi::OsString;
 use std::path::PathBuf;
 
@@ -356,17 +355,23 @@ impl eframe::App for App {
                         ui.separator();
 
                         ui.horizontal(|ui| {
-                            ui.label("Tape groups");
+                            ui.label("Tape sets");
                             if ui.button("+").clicked() {
-                                p.control_data.tape_groups.push(HashSet::new());
+                                p.control_data.add_new_tape_set();
                             }
                         });
-                        ui.indent("Tape groups", |ui| {
-                            for (i, tape_group) in
-                                p.control_data.tape_groups.clone().into_iter().enumerate()
+                        ui.indent("Tape sets", |ui| {
+                            for (i, tape_set) in
+                                p.control_data.tape_sets.clone().into_iter().enumerate()
                             {
                                 ui.horizontal(|ui| {
-                                    ui.label(format!("{} selected", tape_group.len()));
+                                    if let Some(tape_set_mut) = p.control_data.tape_sets.get_mut(i)
+                                    // prevent borrow error from making tape_set mutable
+                                    {
+                                        color_manager(ui, &mut tape_set_mut.outline_color);
+                                    }
+
+                                    ui.label(format!("{} selected", tape_set.pieces.len()));
                                     let selected =
                                         self.mouse_function == MouseFunction::TapeGroup(i);
                                     if ui.add(Button::new("Select").selected(selected)).clicked() {
@@ -378,7 +383,7 @@ impl eframe::App for App {
                                     };
 
                                     if ui.button("-").clicked() {
-                                        p.control_data.tape_groups.remove(i);
+                                        p.control_data.tape_sets.remove(i);
                                     };
                                 });
                             }
@@ -422,16 +427,12 @@ impl eframe::App for App {
                                 }
                             });
                             ui.indent("Solid color", |ui| {
-                                for (i, style, color) in super_data.vec_solid_colors() {
+                                for (i, style, _color) in super_data.vec_solid_colors() {
                                     ui.horizontal(|ui| {
-                                        let mut rgb = [color.r(), color.g(), color.b()];
-                                        if ui.color_edit_button_srgb(&mut rgb).changed() {
-                                            if let Some(color_mut) =
-                                                super_data.solid_colors.get_mut(i)
-                                            {
-                                                *color_mut =
-                                                    Color32::from_rgb(rgb[0], rgb[1], rgb[2]);
-                                            }
+                                        if let Some(color_mut) = super_data.solid_colors.get_mut(i)
+                                        // prevent borrow error from making color mutable
+                                        {
+                                            color_manager(ui, color_mut);
                                         }
 
                                         super_style_manager(
@@ -796,6 +797,13 @@ fn annotation_manager(
             super_data.toggle_annotation_all(annotation);
         };
     });
+}
+
+fn color_manager<'a>(ui: &mut Ui, color: &mut Color32) {
+    let mut rgb = [color.r(), color.g(), color.b()];
+    if ui.color_edit_button_srgb(&mut rgb).changed() {
+        *color = Color32::from_rgb(rgb[0], rgb[1], rgb[2]);
+    }
 }
 
 #[derive(Debug, Clone, Copy)]

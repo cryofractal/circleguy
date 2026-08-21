@@ -142,6 +142,7 @@ impl Triangulation {
 #[derive(Debug, Clone, Copy)]
 pub enum OutlineStyle {
     Normal,
+    NormalWithColor(Color32),
     Taped,
     Hovered,
     HoveredSecondary,
@@ -152,6 +153,7 @@ impl OutlineStyle {
     pub fn width(self) -> f32 {
         match self {
             OutlineStyle::Normal => 1.0,
+            OutlineStyle::NormalWithColor(_color) => 1.0,
             OutlineStyle::Taped => 0.5,
             OutlineStyle::Hovered => 2.0,
             OutlineStyle::HoveredSecondary => 1.5,
@@ -162,6 +164,7 @@ impl OutlineStyle {
     pub fn color(self) -> Color32 {
         match self {
             OutlineStyle::Normal => Color32::BLACK,
+            OutlineStyle::NormalWithColor(color) => color,
             OutlineStyle::Taped => Color32::BLACK,
             OutlineStyle::Hovered => Color32::from_rgb(210, 210, 210),
             OutlineStyle::HoveredSecondary => Color32::from_rgb(168, 168, 168),
@@ -412,9 +415,9 @@ impl Puzzle {
 
             let outline_style = if self
                 .control_data
-                .tape_groups
+                .tape_sets
                 .iter()
-                .any(|tape_group| tape_group.contains(&i))
+                .any(|tape_group| tape_group.pieces.contains(&i))
             {
                 OutlineStyle::Taped
             } else {
@@ -424,11 +427,11 @@ impl Puzzle {
             self.render_piece_outline(i, ui, cc, outline_width, outline_style, solved)?;
         }
 
-        for tape_group in &self.control_data.tape_groups {
+        for tape_set in &self.control_data.tape_sets {
             let mut arc_endpoints = HashMap::new(); // circles as keys is sound because of interning
-            let outline_style = OutlineStyle::Normal;
+            let outline_style = OutlineStyle::NormalWithColor(tape_set.outline_color);
 
-            for i in tape_group {
+            for i in &tape_set.pieces {
                 let Some(piece) = self.position.pieces.get(*i) else {
                     continue;
                 };

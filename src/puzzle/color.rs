@@ -68,3 +68,7 @@ pub fn rainbow_rational(i: usize, n: usize) -> Color32 {
     let colorous::Color { r, g, b } = colorous::RAINBOW.eval_rational(i.rem_euclid(n), n); // make sure it's in the range 0.0..1.0
     Color32::from_rgb(r, g, b)
 }
+
+pub fn golden_ratio_color(n: usize) -> Color32 {
+    rainbow_float(0.61803398874989484 * n as f64)
+}

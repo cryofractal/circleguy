@@ -1,7 +1,6 @@
+use crate::puzzle::color::golden_ratio_color;
 use egui::Color32;
 use std::collections::HashMap;
-
-use crate::puzzle::color::rainbow_float;
 
 /// Data on color scheme for super puzzles
 #[derive(Debug, Clone)]
@@ -173,7 +172,7 @@ impl SuperData {
     }
 
     pub fn add_color(&mut self) {
-        let next_unused = rainbow_float(0.61803398874989484 * self.solid_colors.len() as f64);
+        let next_unused = golden_ratio_color(self.solid_colors.len());
         self.solid_colors.push(next_unused);
     }
 

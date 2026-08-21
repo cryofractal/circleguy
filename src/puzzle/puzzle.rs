@@ -149,9 +149,12 @@ impl Puzzle {
             }
         }
 
-        for (ti, tape_group) in self.control_data.tape_groups.iter().enumerate() {
-            if tape_group.iter().any(|t| pieces_turned.contains(t))
-                && tape_group.iter().any(|t| pieces_not_turned.contains(t))
+        for (ti, tape_set) in self.control_data.tape_sets.iter().enumerate() {
+            if tape_set.pieces.iter().any(|t| pieces_turned.contains(t))
+                && tape_set
+                    .pieces
+                    .iter()
+                    .any(|t| pieces_not_turned.contains(t))
             {
                 return Err(format!("Blocked by tape group {ti}"));
             }
