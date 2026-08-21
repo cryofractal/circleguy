@@ -2,7 +2,11 @@
 
 general puzzle simulator for circle puzzles. currently supports custom puzzle definitions and keybinds.
 
-# Super mode
+# Tape Blocks
+
+Tape blocks are ad-hoc piece groupings that block turns that break their current configuration. Create a tape block by pressing the `+` button in the Puzzle Info window. Toggle select mode for each tape block by pressing `Select` next to each tape block. In select mode, left-clicking pieces adds it to the tape block if it was not in the block already, and removes it if it was. Shift-clicking on a tape block while selecting pieces for another one merges clicked block into the selecting one.
+
+# Super Mode
 
 Right-click a puzzle in the puzzle menu to open it in super mode. From the super mode window, you can choose which pieces will be shown with orientation color and which will be shown in starburst by selecting `Select`. While selecting starburst pieces, right-click on a piece to make it the center of the starburst. `All` makes all pieces show the chosen scheme.
 
