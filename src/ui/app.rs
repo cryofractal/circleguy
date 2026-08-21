@@ -290,6 +290,9 @@ impl eframe::App for App {
                         && !self.preview
                         && let Some(ref mut p) = self.puzzle
                     {
+                        // If this is not present, information may be able to leak about piece identity through scrambling in non-super puzzles
+                        self.hovered_piece = None;
+
                         let _ = p.scramble(self.cut_on_turn);
                     }
                     //reset button

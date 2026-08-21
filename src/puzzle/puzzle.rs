@@ -223,6 +223,10 @@ impl Puzzle {
     ///scramble the puzzle self.depth moves
     pub fn scramble(&mut self, cut: bool) -> Result<(), String> {
         self.reset()?;
+
+        // Tape sets cannot persist through scrambling
+        self.control_data.tape_sets = Vec::new();
+
         let mut scramble = Vec::new();
         let mut h = DefaultHasher::new();
         web_time::Instant::now().hash(&mut h);
@@ -252,6 +256,9 @@ impl Puzzle {
     ///reset the puzzle, using the stored definition
     pub fn reset(&mut self) -> Result<(), String> {
         self.position = PuzzlePosition::new(self.solved_pieces.clone());
+
+        self.control_data.tape_sets = Vec::new();
+
         Ok(())
     }
 
