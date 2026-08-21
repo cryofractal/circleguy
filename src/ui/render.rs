@@ -452,10 +452,11 @@ impl Puzzle {
                 };
 
                 for arc in &piece.piece.shape.border {
+                    let new_center = arc.circle.center * isometry;
                     arc_endpoints
                         .entry((
-                            FloatOrd(arc.circle.center.0.re),
-                            FloatOrd(arc.circle.center.0.im),
+                            FloatOrd(new_center.0.re),
+                            FloatOrd(new_center.0.im),
                             FloatOrd(arc.circle.r_sq),
                         ))
                         .or_insert(ArcEndpoints::new())
