@@ -388,14 +388,7 @@ impl eframe::App for App {
                                     };
 
                                     if ui.button("-").clicked() {
-                                        p.control_data.tape_sets.remove(i);
-                                        if let MouseFunction::TapeSet(t) = self.mouse_function {
-                                            if t == i {
-                                                self.mouse_function = MouseFunction::Normal;
-                                            } else if t > i {
-                                                self.mouse_function = MouseFunction::TapeSet(t - 1);
-                                            }
-                                        }
+                                        remove_tape_set(p, &mut self.mouse_function, i);
                                     };
                                 });
                             }
@@ -649,7 +642,19 @@ impl App {
                     match mouse.typ {
                         MouseInteractionType::Click => {
                             if let Some(hovered_piece) = hovered_piece {
-                                puzzle.control_data.toggle_tape_group(i, hovered_piece);
+                                if mouse.shift {
+                                    // Absorb tape set
+                                    if let Some(j) = puzzle.control_data.get_tape_set(hovered_piece)
+                                        && j != i
+                                    {
+                                        let absorbed =
+                                            puzzle.control_data.tape_sets[j].pieces.clone();
+                                        puzzle.control_data.tape_sets[i].pieces.extend(absorbed);
+                                        remove_tape_set(puzzle, &mut self.mouse_function, j);
+                                    }
+                                } else {
+                                    puzzle.control_data.toggle_tape_set(i, hovered_piece);
+                                }
                             }
                         }
                         MouseInteractionType::SecondaryClick => {}
@@ -661,7 +666,7 @@ impl App {
                             if let Some(hovered_piece) = hovered_piece {
                                 match self.inserting_on_drag {
                                     Some(insert) => {
-                                        puzzle.control_data.toggle_tape_group_to(
+                                        puzzle.control_data.toggle_tape_set_to(
                                             i,
                                             hovered_piece,
                                             insert,
@@ -669,7 +674,7 @@ impl App {
                                     }
                                     None => {
                                         self.inserting_on_drag = Some(
-                                            puzzle.control_data.toggle_tape_group(i, hovered_piece),
+                                            puzzle.control_data.toggle_tape_set(i, hovered_piece),
                                         )
                                     }
                                 }
@@ -758,6 +763,18 @@ impl App {
         }
 
         Some(())
+    }
+}
+
+fn remove_tape_set(puzzle: &mut Puzzle, mouse_function: &mut MouseFunction, i: usize) {
+    puzzle.control_data.tape_sets.remove(i);
+
+    if let MouseFunction::TapeSet(t) = mouse_function {
+        if *t == i {
+            *mouse_function = MouseFunction::Normal;
+        } else if *t > i {
+            *mouse_function = MouseFunction::TapeSet(*t - 1);
+        }
     }
 }
 

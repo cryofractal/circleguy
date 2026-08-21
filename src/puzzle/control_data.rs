@@ -29,7 +29,13 @@ impl ControlData {
         })
     }
 
-    pub fn toggle_tape_group(&mut self, index: usize, piece: usize) -> bool {
+    pub fn get_tape_set(&mut self, piece: usize) -> Option<usize> {
+        self.tape_sets
+            .iter()
+            .position(|tape_set| tape_set.pieces.contains(&piece))
+    }
+
+    pub fn toggle_tape_set(&mut self, index: usize, piece: usize) -> bool {
         if let Some(tape_group) = self.tape_sets.get_mut(index) {
             if tape_group.pieces.contains(&piece) {
                 tape_group.pieces.remove(&piece);
@@ -43,7 +49,7 @@ impl ControlData {
         }
     }
 
-    pub fn toggle_tape_group_to(&mut self, index: usize, piece: usize, insert: bool) {
+    pub fn toggle_tape_set_to(&mut self, index: usize, piece: usize, insert: bool) {
         if let Some(tape_group) = self.tape_sets.get_mut(index) {
             if insert {
                 tape_group.pieces.insert(piece);
